@@ -121,7 +121,7 @@ mvn spring-boot:run
 ---
 
 ## ✍️ Author
-Likhitha — [@plikhithareddy](https://gitlab.stackroute.in/java_assignments1/culinary_coordinator_project)
+Likhitha — [@plikhithareddy](https://github.com/Likhitha8894/culinary.git)
 
 ---
 

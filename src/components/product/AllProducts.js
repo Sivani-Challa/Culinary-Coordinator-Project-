@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { Box, Container, Typography, CircularProgress, Pagination, IconButton } from '@mui/material';
 import { Favorite as FavoriteIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import Footer from '../footer/Footer';
 
 const AllProducts = () => {
   const [items, setItems] = useState([]);
@@ -199,8 +198,6 @@ const AllProducts = () => {
         )}
       </Container>
       
-      {/* Footer */}
-      <Footer />
     </>
   );
 };

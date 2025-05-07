@@ -14,8 +14,11 @@ import {
   FormControl,
   InputLabel,
   Select,
-  FormHelperText
+  FormHelperText,
+  Grid,
+  Divider
 } from '@mui/material';
+import { ArrowBack } from '@mui/icons-material';
 import * as Yup from 'yup';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -56,10 +59,9 @@ const ProfileEdit = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
-  const navigate = useNavigate();  // Correct usage of useNavigate inside the component.
-
+  const navigate = useNavigate();
+  
   // Get the user ID and token from localStorage
-  const userId = localStorage.getItem('userId') || '5'; // Default to 5 for testing
   const token = localStorage.getItem('token') || '';
 
   useEffect(() => {
@@ -72,8 +74,7 @@ const ProfileEdit = () => {
       }
 
       try {
-        console.log('Fetching profile for user ID:', userId);
-        console.log('Using token:', token);
+        console.log('Fetching profile data...');
         
         const response = await axios.get(`http://localhost:8082/profile`, {
           headers: {
@@ -92,7 +93,7 @@ const ProfileEdit = () => {
     };
 
     fetchUserProfile();
-  }, [userId, token]);
+  }, [token]);
 
   const handleSubmit = async (values, { setSubmitting }) => {
     if (!token) {
@@ -127,7 +128,8 @@ const ProfileEdit = () => {
 
       console.log('Sending update request with data:', updatedProfile);
 
-      const response = await axios.put(`http://localhost:8082/update/`, updatedProfile, {
+      // Send data to your update endpoint
+      const response = await axios.put('http://localhost:8082/update', updatedProfile, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -148,7 +150,7 @@ const ProfileEdit = () => {
       console.error('Error updating profile:', err);
       setNotification({
         open: true,
-        message: err.response?.data || 'Failed to update profile. Please try again.',
+        message: err.response?.data?.message || 'Failed to update profile. Please try again.',
         severity: 'error'
       });
     } finally {
@@ -199,6 +201,20 @@ const ProfileEdit = () => {
 
   return (
     <Container component="main" maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      {/* Back navigation */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => navigate('/')}
+          sx={{ 
+            textTransform: 'none',
+            color: 'primary.main',
+          }}
+        >
+          Back to Home
+        </Button>
+      </Box>
+
       <Paper elevation={3} sx={{ p: 4 }}>
         <Typography variant="h4" component="h1" sx={{ mb: 4, fontWeight: 'bold', color: '#442c2e', textAlign: 'center' }}>
           Edit Profile
@@ -214,37 +230,41 @@ const ProfileEdit = () => {
             state: userData.state || '',
             zipcode: userData.zipcode || '',
             country: userData.country || '',
-            securityQuestion: '',
+            securityQuestion: userData.securityQuestion || '',
             securityQuestionAnswer: ''
           }}
           validationSchema={ProfileEditSchema}
           onSubmit={handleSubmit}
-          enableReinitialize={true} // Important! This ensures form updates when userData changes
+          enableReinitialize={true}
         >
           {({ errors, touched, isSubmitting, values, setFieldValue, handleBlur }) => (
             <Form>
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <Field
-                  as={TextField}
-                  name="firstName"
-                  label="First Name"
-                  fullWidth
-                  variant="outlined"
-                  margin="normal"
-                  error={touched.firstName && Boolean(errors.firstName)}
-                  helperText={touched.firstName && errors.firstName}
-                />
-                <Field
-                  as={TextField}
-                  name="lastName"
-                  label="Last Name"
-                  fullWidth
-                  variant="outlined"
-                  margin="normal"
-                  error={touched.lastName && Boolean(errors.lastName)}
-                  helperText={touched.lastName && errors.lastName}
-                />
-              </Box>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Field
+                    as={TextField}
+                    name="firstName"
+                    label="First Name"
+                    fullWidth
+                    variant="outlined"
+                    margin="normal"
+                    error={touched.firstName && Boolean(errors.firstName)}
+                    helperText={touched.firstName && errors.firstName}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Field
+                    as={TextField}
+                    name="lastName"
+                    label="Last Name"
+                    fullWidth
+                    variant="outlined"
+                    margin="normal"
+                    error={touched.lastName && Boolean(errors.lastName)}
+                    helperText={touched.lastName && errors.lastName}
+                  />
+                </Grid>
+              </Grid>
 
               <Field
                 as={TextField}
@@ -253,7 +273,7 @@ const ProfileEdit = () => {
                 fullWidth
                 variant="outlined"
                 margin="normal"
-                disabled={true} // Email cannot be changed
+                disabled={true}
                 error={touched.email && Boolean(errors.email)}
                 helperText={touched.email && errors.email}
               />
@@ -280,28 +300,32 @@ const ProfileEdit = () => {
                 helperText={touched.address && errors.address}
               />
 
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <Field
-                  as={TextField}
-                  name="state"
-                  label="State"
-                  fullWidth
-                  variant="outlined"
-                  margin="normal"
-                  error={touched.state && Boolean(errors.state)}
-                  helperText={touched.state && errors.state}
-                />
-                <Field
-                  as={TextField}
-                  name="zipcode"
-                  label="Zipcode"
-                  fullWidth
-                  variant="outlined"
-                  margin="normal"
-                  error={touched.zipcode && Boolean(errors.zipcode)}
-                  helperText={touched.zipcode && errors.zipcode}
-                />
-              </Box>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Field
+                    as={TextField}
+                    name="state"
+                    label="State"
+                    fullWidth
+                    variant="outlined"
+                    margin="normal"
+                    error={touched.state && Boolean(errors.state)}
+                    helperText={touched.state && errors.state}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Field
+                    as={TextField}
+                    name="zipcode"
+                    label="Zipcode"
+                    fullWidth
+                    variant="outlined"
+                    margin="normal"
+                    error={touched.zipcode && Boolean(errors.zipcode)}
+                    helperText={touched.zipcode && errors.zipcode}
+                  />
+                </Grid>
+              </Grid>
 
               <Field
                 as={TextField}
@@ -313,6 +337,8 @@ const ProfileEdit = () => {
                 error={touched.country && Boolean(errors.country)}
                 helperText={touched.country && errors.country}
               />
+
+              <Divider sx={{ my: 3 }} />
 
               <Typography variant="h6" component="h2" sx={{ mt: 3, mb: 2 }}>
                 Security Information
@@ -362,22 +388,22 @@ const ProfileEdit = () => {
                 helperText={touched.securityQuestionAnswer && errors.securityQuestionAnswer}
               />
 
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+              <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
                 <Button
                   variant="outlined"
                   color="primary"
                   onClick={() => navigate('/')}
                 >
-                  Cancel
+                  CANCEL
                 </Button>
                 <Button
                   type="submit"
                   variant="contained"
                   color="primary"
                   disabled={isSubmitting}
-                  sx={{ minWidth: 120 }}
+                  sx={{ minWidth: 150 }}
                 >
-                  {isSubmitting ? <CircularProgress size={24} /> : 'Save Changes'}
+                  {isSubmitting ? <CircularProgress size={24} /> : 'SAVE CHANGES'}
                 </Button>
               </Box>
             </Form>

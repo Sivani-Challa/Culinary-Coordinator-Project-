@@ -1,9 +1,10 @@
 // LoginForm.jsx
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react'; // Added useContext import
 import { Formik, Field, Form } from 'formik';
 import { TextField, Button, Box, Typography, Link, Alert, CircularProgress } from '@mui/material';
 import * as Yup from 'yup';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext'; // Added import for AuthContext
 
 // Validation Schema
 const LoginSchema = Yup.object().shape({
@@ -15,6 +16,7 @@ const LoginForm = ({ onLogin }) => {
   const [loginError, setLoginError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
   const handleSubmit = async (values, { setSubmitting }) => {
     setIsLoading(true);
@@ -33,23 +35,46 @@ const LoginForm = ({ onLogin }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response;
-        throw new Error(errorData.message || 'Login failed. Please check your credentials.');
+        let errorMessage = 'Login failed. Please check your credentials.';
+        try{
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // If parsing fails, try to get the text
+          try {
+            const errorText = await response.text();
+            if (errorText) errorMessage = errorText;
+          } catch (textError) {
+            // If even text extraction fails, use default message
+            console.error('Could not parse error response:', textError);
+          }
+        }
+        throw new Error(errorMessage);
+
       }
 
       const data = await response.json(); // Ensure you parse the response as JSON
-    console.log('Login successful:', data);
+      console.log('Login successful:', data);
 
-    // Log the token in the console
-    console.log('Token:', data.token);  // This will print the token to the console
-    
-    // Store the token and user data in localStorage
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('userName', data.userName);
+      // Log the token in the console
+      console.log('Token:', data.token);  // This will print the token to the console
       
-      // Call the onLogin callback from parent component
+      // Store the token and user data in localStorage
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('userName', data.userName);
+        
+      // Create a user object instead of just passing the username
+      const userData = { 
+        username: data.userName,
+        // Include any other user fields from your API response
+      };
+      
+      // Call the context login function directly
+      login(userData, data.token);
+      
+      // Also call the onLogin prop if provided
       if (onLogin) {
-        onLogin(data.userName, data.token);
+        onLogin(userData, data.token);
       }
       
       // Redirect to home page

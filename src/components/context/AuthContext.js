@@ -1,4 +1,3 @@
-// src/context/AuthContext.js
 import React, { createContext, useState, useEffect } from 'react';
 
 // Create the context
@@ -13,37 +12,69 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Check if user is logged in when component mounts
     const checkLoginStatus = () => {
+      try{
       const token = localStorage.getItem('token');
       const userData = localStorage.getItem('user');
       
-      if (token && userData) {
+      if (token) {
         setIsLoggedIn(true);
-        try {
-          setUser(JSON.parse(userData));
+          if (userData) {
+            setUser(JSON.parse(userData));
+          } else {
+            const userName = localStorage.getItem('userName');
+            if (userName) {
+              setUser({ username: userName });
+            }
+          }
+          } else {
+            setIsLoggedIn(false);
+            setUser(null);
+          }
         } catch (error) {
-          console.error('Error parsing user data:', error);
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
+          console.error('Error checking login status:', error);
           setIsLoggedIn(false);
+          setUser(null);
+        } finally {
+          setAuthLoading(false);
         }
-      }
-      
-      setAuthLoading(false);
-    };
+        };
+    
+        checkLoginStatus();
 
-    checkLoginStatus();
+          // Add event listener for login events
+    const handleLoginEvent = () => {
+      checkLoginStatus();
+    };
+    
+    window.addEventListener('storage', handleLoginEvent);
+    window.addEventListener('auth-login', handleLoginEvent);
+    
+    return () => {
+      window.removeEventListener('storage', handleLoginEvent);
+      window.removeEventListener('auth-login', handleLoginEvent);
+    };
   }, []);
 
   const login = (userData, token) => {
+    console.log('Login called in AuthContext with:', { userData, token });
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    if (userData) {
+      if (typeof userData === 'object') {
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('userName', userData.username || userData.name || '');
+      }
+    }
     setIsLoggedIn(true);
     setUser(userData);
+
+    // Dispatch a custom event to notify components
+    window.dispatchEvent(new Event('auth-login'));
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('userName');
     setIsLoggedIn(false);
     setUser(null);
   };

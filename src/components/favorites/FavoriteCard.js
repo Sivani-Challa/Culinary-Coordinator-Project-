@@ -1,66 +1,83 @@
-import React, { useState } from 'react';
-import { Card, CardContent, Typography, IconButton, Box, CardMedia } from '@mui/material';
-import { Favorite, FavoriteBorder, Visibility } from '@mui/icons-material';
-import LoginPopup from '../common/LoginPopup'; 
+import React from 'react';
+import { Card, CardContent, CardActions, Typography, IconButton, Tooltip } from '@mui/material';
+import { Visibility, Delete } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
 
-const FavoriteCard = ({ item, onAddToFavorites, isLoggedIn }) => {
-  const [loginPopupOpen, setLoginPopupOpen] = useState(false);
-
-  const handleAddToFavorites = () => {
-    if (isLoggedIn) {
-      onAddToFavorites(item);  // If logged in, add to favorites
-    } else {
-      setLoginPopupOpen(true);  // Otherwise, show the login popup
-    }
-  };
-
-  const handleCloseLoginPopup = () => {
-    setLoginPopupOpen(false);  // Close the login popup
-  };
+const FavoriteCard = ({ item, onRemoveFromFavorites }) => {
+  // Handle case where the item structure might vary
+  const productId = item.id;
+  const name = item.name || item.itemname || 'Unknown Product';
+  const brand = item.brand || item.manufacturer || '';
+  const favoriteId = item.favoriteId || item.id;
 
   return (
-    <>
-      <Card sx={{ maxWidth: 345, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {item.imageUrl && (
-          <CardMedia
-            component="img"
-            height="140"
-            image={item.imageUrl}
-            alt={item.itemName}
-          />
-        )}
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Typography variant="h6" component="div">
-            {item.itemName}
-          </Typography>
-          <Typography color="textSecondary" gutterBottom>
-            {item.brand}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {item.description}
-          </Typography>
-        </CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', padding: 1 }}>
-          <IconButton aria-label="view item">
+    <Card 
+      elevation={1} 
+      sx={{ 
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        position: 'relative'
+      }}
+    >
+      <CardContent sx={{ flexGrow: 1, pb: 0 }}>
+        {/* Product Name with text wrapping */}
+        <Typography 
+          variant="h6" 
+          component="h2" 
+          sx={{ 
+            mb: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: 1.2,
+            height: '2.4em'
+          }}
+        >
+          {name}
+        </Typography>
+        
+        {/* Brand/Manufacturer */}
+        <Typography 
+          variant="body2" 
+          color="text.secondary"
+          sx={{
+            mb: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {brand}
+        </Typography>
+      </CardContent>
+      
+      <CardActions sx={{ justifyContent: 'space-between', p: 1 }}>
+        <Tooltip title="View Product">
+          <IconButton 
+            component={Link} 
+            to={`/products/${productId}`} 
+            size="small" 
+            color="primary"
+          >
             <Visibility />
           </IconButton>
+        </Tooltip>
+        
+        <Tooltip title="Remove from Favorites">
           <IconButton 
-            onClick={handleAddToFavorites} 
-            color="primary" 
-            aria-label="add to favorites"
+            onClick={() => onRemoveFromFavorites(favoriteId)} 
+            size="small" 
+            color="error"
           >
-            {isLoggedIn && item.isFavorite ? <Favorite /> : <FavoriteBorder />}
+            <Delete />
           </IconButton>
-        </Box>
-      </Card>
-
-      {/* Show the Login Popup when not logged in */}
-      <LoginPopup 
-        open={loginPopupOpen} 
-        onClose={handleCloseLoginPopup} 
-        showLoginButton={true} // Display the login button in the popup
-      />
-    </>
+        </Tooltip>
+      </CardActions>
+    </Card>
   );
 };
 

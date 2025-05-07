@@ -1,9 +1,18 @@
-// Updated Home.jsx with fixed login popup
 import React, { useEffect, useState } from 'react';
-import { Box, Container, Typography, CircularProgress, Pagination, IconButton } from '@mui/material';
+import {
+  Box,
+  Container,
+  Typography,
+  CircularProgress,
+  Pagination,
+  IconButton,
+  Snackbar,
+  Alert
+} from '@mui/material';
 import { Favorite as FavoriteIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import LoginPopup from '../common/LoginPopup';
+import { checkIsFavorite } from '../../api/favoriteService';
 
 const Home = () => {
   const [items, setItems] = useState([]);
@@ -15,6 +24,11 @@ const Home = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginPopupOpen, setLoginPopupOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  // Add state for Snackbar
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
   // Use effect to check login status
   useEffect(() => {
@@ -23,14 +37,38 @@ const Home = () => {
       setIsLoggedIn(!!token); // Convert to boolean
     };
 
+    const fetchUserProfile = async () => {
+      if (isLoggedIn) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          try {
+            const response = await fetch('http://localhost:8083/profile', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              }
+            });
+            if (response.ok) {
+              const profileData = await response.json();
+              setUserProfile(profileData);
+            } else {
+              console.error('Failed to fetch profile data');
+            }
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+          }
+        }
+      }
+    };
+
     checkLoginStatus();
+    fetchUserProfile();
 
     // Listen for storage changes (in case user logs in from another tab)
     window.addEventListener('storage', checkLoginStatus);
     return () => {
       window.removeEventListener('storage', checkLoginStatus);
     };
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     // Fetch items from the JSON server
@@ -70,68 +108,94 @@ const Home = () => {
     window.scrollTo(0, 0);
   };
 
-  const handleAddToFavorites = async (id)  => {
-     // Check if the user is logged in
-  if (isLoggedIn) {
-    console.log('Adding to favorites:', id);
-    
-    const item = items.find((item) => item.id === id);  // Find the item clicked
-    if (!item) {
-      console.error('Item not found');
-      return;
-    }
+  const handleAddToFavorites = async (id) => {
+    // Check if the user is logged in
+    if (isLoggedIn) {
+      console.log('Adding to favorites:', id);
 
-    try {
-      // Get the auth token from localStorage
-      const authToken = localStorage.getItem('token');
-      
-      if (!authToken) {
-        console.error('No auth token found');
+      const item = items.find((item) => item.id === id);  // Find the item clicked
+      if (!item) {
+        console.error('Item not found');
+        setSnackbarMessage('Item not found');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
         return;
       }
-      
-      // Make the API request to add the item to favorites
-      setLoading(true);  // Set loading to true while the request is being processed
-      const response = await fetch('http://localhost:8083/favorite/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`,  // Pass the token in the header
-        //'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(item),  // Send the item in the request body
-      });
 
-      if (!response.ok) {
-        throw new Error(`Server responded with status: ${response.status}`);
+      try {
+        // Check if the item is already in favorites first
+        const isAlreadyFavorite = await checkIsFavorite(id);
+
+        if (isAlreadyFavorite) {
+          // Item is already in favorites
+          setSnackbarMessage('Already available in favorites');
+          setSnackbarSeverity('info');
+          setSnackbarOpen(true);
+          return;
+        }
+        // First check if the item is already in favorites
+        //const isAlreadyFavorite = await checkIsFavorite(id);
+        // Get the auth token from localStorage
+        const authToken = localStorage.getItem('token');
+        if (!authToken) {
+          console.error('No auth token found');
+          return;
+        }
+
+        // Make the API request to add the item to favorites
+        setLoading(true);  // Set loading to true while the request is being processed
+        const response = await fetch('http://localhost:8083/favorite/add', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,  // Pass the token in the header
+          },
+          body: JSON.stringify(item),  // Send the item in the request body
+        });
+
+        // Check for 409 Conflict status specifically
+        if (response.status === 409) {
+          // This is a duplicate - show appropriate message
+          setSnackbarMessage('Item is already in your favorites');
+          setSnackbarSeverity('info');
+          setSnackbarOpen(true);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+
+        // Show success message - make it clear this was a NEW addition
+        setSnackbarMessage('Successfully added to favorites');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+
+        // Reset error
+        setError(null);
+
+
+      } catch (error) {
+        console.error('Error adding item to favorites:', error);
+          // Check if error message contains "already in favorites"
+      if (error.message && error.message.toLowerCase().includes('already in favorites')) {
+        setSnackbarMessage('Item is already in your favorites');
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+      } else {
+        // General error handling
+        setError('Failed to add item to favorites. Please try again.');
+        setSnackbarMessage('Error adding to favorites');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
       }
-
-      const data = await response.json();
-      console.log('Item added to favorites:', data);
-      
-      // Optionally, you can update your items or the UI
-      // For example: setItems(data.items); or update the state
-
-      // Reset error
-      setError(null);
-      
-    } catch (error) {
-      console.error('Error adding item to favorites:', error);
-      setError('Failed to add item to favorites. Please try again.');
     } finally {
       setLoading(false);  // Set loading to false after the request is completed
     }
   } else {
     console.log('User not logged in, showing popup');
-    
     // Force dialog to reopen by first closing then opening
     setLoginPopupOpen(true);
-    
-    // // Use setTimeout to ensure the state update completes before reopening
-    // setTimeout(() => {
-    //   setLoginPopupOpen(true);
-    // }, 50);
   }
 };
 
@@ -149,8 +213,13 @@ const Home = () => {
     console.log('Login successful');
     // setIsLoggedIn(true);
     setLoginPopupOpen(false);
-     // Redirect to the login page
-  navigate('/login');
+    // Redirect to the login page
+    navigate('/login');
+  };
+
+  // Handle closing the snackbar
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
 
   return (
@@ -168,6 +237,14 @@ const Home = () => {
           >
             Welcome to Culinary Mart!
           </Typography>
+
+          {/* Display profile info if user is logged in */}
+          {isLoggedIn && userProfile && (
+            <Typography variant="h6" sx={{ marginBottom: '20px' }}>
+              Welcome, {userProfile.name || 'User'}!
+            </Typography>
+          )}
+
           <Typography
             variant="h6"
             sx={{
@@ -319,16 +396,30 @@ const Home = () => {
             </Box>
           </>
         )}
+        {/* Snackbar for messages */}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbarSeverity}
+            sx={{ width: '100%' }}
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
       </Container>
 
-      {/* Login Popup - without key prop */}
+      {/* Login Popup */}
       <LoginPopup
         open={loginPopupOpen}
         onClose={handleCloseLoginPopup}
         onLogin={handleLogin}
         showLoginButton={true}
       />
-
     </>
   );
 };

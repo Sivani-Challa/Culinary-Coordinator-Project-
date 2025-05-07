@@ -1,15 +1,26 @@
 // LoginPage.jsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { Box } from '@mui/material';
 import LoginForm from './LoginForm';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext'; // Adjust the import path as necessary
 
-const LoginPage = ({ onLogin }) => {
+
+const LoginPage = () => {
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
+
+   // Pass login function to LoginForm
+   const handleLoginSuccess = (userData, token) => {
+    console.log('Login handler in LoginPage called with:', userData, token);
+    login(userData, token);
+    navigate('/');
+  };
 
   // Effect to hide scrollbar on mount and restore on unmount
   useEffect(() => {
-    // Check if already logged in
+  
+    // Check if token exists in localStorage
     const token = localStorage.getItem('token');
     if (token) {
       // If already logged in, redirect to home
@@ -60,7 +71,7 @@ const LoginPage = ({ onLogin }) => {
           p: { xs: 2, sm: 0 }
         }}
       >
-        <LoginForm onLogin={onLogin} />
+        <LoginForm onLogin={handleLoginSuccess} />
       </Box>
     </Box>
   );

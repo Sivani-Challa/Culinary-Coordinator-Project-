@@ -17,8 +17,7 @@ import { Box, CssBaseline, CircularProgress } from '@mui/material';
 import Footer from './components/footer/Footer';
 import ForgotPassword from './components/password/ForgotPassword';
 import ProfileEdit from './components/profileedit/ProfileEdit';
-
-
+import AuthProvider from './components/context/AuthContext';
 
 const App = () => {
   // Authentication state management
@@ -61,13 +60,24 @@ const App = () => {
   };
 
   // Logout function
+  // const logout = () => {
+  //   localStorage.removeItem('token');
+  //   localStorage.removeItem('user');
+  //   setIsLoggedIn(false);
+  //   setUser(null);
+  // };
+
   const logout = () => {
+    // Clear user data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setIsLoggedIn(false);
     setUser(null);
+    
+    // Reload the page to go to the homepage
+    window.location.href = '/';
   };
-
+  
   // Update ProtectedRoute to accept auth props
   const ProtectedRouteWithAuth = ({ children }) => {
     // Show loading indicator while checking auth status
@@ -90,6 +100,7 @@ const App = () => {
     <>
       <CssBaseline />
       <Router>
+        <AuthProvider>
         <Header isLoggedIn={isLoggedIn} onLogout={logout} user={user} />
         <Box sx={{ padding: 2 }}>
           <Routes>
@@ -97,13 +108,14 @@ const App = () => {
             <Route path="/login" element={<LoginPage onLogin={login} />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/product/:id" element={<ProductDetail isLoggedIn={isLoggedIn} />} />
+            <Route path="/favorite/product/:id" element={<ProductDetail fromFavorites={true} />} />
             <Route path="/all-products" element={<AllProducts />} />
             <Route path="/faqs" element={<FAQs />} />
             <Route path="/contactus" element={<ContactUs />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/cookies" element={<CookiePolicy />} />
             <Route path="/search" element={<SearchResults />} />
-            <Route path="/logout" element={<LoginPage onLogin={login} />} />
+            <Route path="/logout" element={<LoginPage onLogout={logout} />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/profile" element={<ProtectedRouteWithAuth>
                   <ProfileEdit/>
@@ -118,9 +130,11 @@ const App = () => {
                 </ProtectedRouteWithAuth>
               } 
             />
+            
           </Routes>
         </Box>
         <Footer />
+        </AuthProvider>
       </Router>
     </>
   );

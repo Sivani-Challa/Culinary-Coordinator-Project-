@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   AppBar, 
   Toolbar, 
@@ -11,7 +11,8 @@ import {
   MenuItem,
   Avatar,
   Divider,
-  CircularProgress
+  CircularProgress,
+  Badge
 } from '@mui/material';
 import { 
   Link, 
@@ -26,17 +27,26 @@ import {
   ExitToApp as LogoutIcon,
   ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
+import { AuthContext } from '../context/AuthContext';
 
-const Header = ({ isLoggedIn, onLogout }) => {
+const Header = () => {
+  // Use context directly instead of props
+  const { isLoggedIn, logout } = useContext(AuthContext);
   const [searchQuery, setSearchQuery] = useState('');
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   
   // State for user dropdown menu
   const [anchorEl, setAnchorEl] = useState(null);
+  // State for favorites menu
+  const [favAnchorEl, setFavAnchorEl] = useState(null);
+  
   const open = Boolean(anchorEl);
+  const favOpen = Boolean(favAnchorEl);
   
   // Fetch user data from backend when component mounts or isLoggedIn changes
   useEffect(() => {
@@ -68,6 +78,49 @@ const Header = ({ isLoggedIn, onLogout }) => {
     fetchUserData();
   }, [isLoggedIn]);
   
+  // Fetch favorites when logged in
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (!isLoggedIn) {
+        setFavorites([]);
+        return;
+      }
+      
+      setFavoritesLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No auth token found');
+          return;
+        }
+        
+        const response = await fetch('http://localhost:8083/favorite/list', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error fetching favorites: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Fetched favorites:', data);
+        setFavorites(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Failed to fetch favorites:', error);
+        setFavorites([]);
+      } finally {
+        setFavoritesLoading(false);
+      }
+    };
+    
+    fetchFavorites();
+  }, [isLoggedIn, location.pathname]); // Re-fetch when route changes
+  
   // Get current location (path) to check if we're on login/register page
   const isLoginOrRegisterPage = location.pathname === '/login' || location.pathname === '/register';
   
@@ -92,12 +145,32 @@ const Header = ({ isLoggedIn, onLogout }) => {
     setAnchorEl(null);
   };
   
+  // Favorites menu handlers
+  const handleFavoritesClick = (event) => {
+    event.preventDefault(); // Prevent immediate navigation
+    
+    if (favorites.length > 0) {
+      setFavAnchorEl(event.currentTarget);
+    } else {
+      // If no favorites, just navigate to favorites page
+      navigate('/favorites');
+    }
+  };
+  
+  const handleFavoritesClose = () => {
+    setFavAnchorEl(null);
+  };
+  
+  const handleFavoriteItemClick = (favorite) => {
+    handleFavoritesClose();
+    // Navigate to the product detail page for the selected favorite
+    navigate(`/product/${favorite.productId || favorite.id}`);
+  };
+  
   const handleLogout = () => {
     handleUserMenuClose();
-    if (onLogout) {
-      onLogout();
-    }
-    navigate('/');
+    logout(); // This now just calls the context's logout function
+    navigate('/'); // Ensure navigation happens after logout
   };
   
   const handleNavigate = (path) => {
@@ -169,16 +242,108 @@ const Header = ({ isLoggedIn, onLogout }) => {
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           {isLoggedIn ? (
             <>
-              {/* Favorites Link for logged-in users */}
+              {/* Favorites Icon with Badge for logged-in users */}
               <IconButton 
                 color="inherit" 
-                component={Link} 
-                to="/favorites"
+                onClick={handleFavoritesClick}
                 sx={{ mr: 1 }}
                 aria-label="favorites"
+                aria-controls={favOpen ? "favorites-menu" : undefined}
+                aria-haspopup="true"
+                aria-expanded={favOpen ? "true" : undefined}
               >
-                <FavoriteIcon />
+                <Badge 
+                  badgeContent={favoritesLoading ? '...' : favorites.length} 
+                  color="error"
+                  max={99}
+                >
+                  <FavoriteIcon />
+                </Badge>
               </IconButton>
+              
+              {/* Favorites dropdown menu */}
+              <Menu
+                id="favorites-menu"
+                anchorEl={favAnchorEl}
+                open={favOpen}
+                onClose={handleFavoritesClose}
+                MenuListProps={{
+                  'aria-labelledby': 'favorites-button',
+                }}
+                PaperProps={{
+                  style: {
+                    maxHeight: 300,
+                    width: '300px',
+                  },
+                }}
+              >
+                <Box p={1}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    My Favorites ({favorites.length})
+                  </Typography>
+                </Box>
+                <Divider />
+                
+                {favoritesLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : favorites.length > 0 ? (
+                  <>
+                    {favorites.slice(0, 5).map((favorite) => (
+                      <MenuItem 
+                        key={favorite.id || favorite.productId} 
+                        onClick={() => handleFavoriteItemClick(favorite)}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                          {favorite.image && (
+                            <img 
+                              src={favorite.image} 
+                              alt={favorite.name || favorite.title || 'Product'} 
+                              style={{ width: 40, height: 40, marginRight: 10, objectFit: 'contain' }}
+                            />
+                          )}
+                          <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
+                            {favorite.name || favorite.title || 'Product Item'}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                    
+                    {favorites.length > 5 && (
+                      <Box p={1} textAlign="center">
+                        <Typography 
+                          variant="body2" 
+                          color="primary" 
+                          onClick={() => {
+                            handleFavoritesClose();
+                            navigate('/favorites');
+                          }}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          View all {favorites.length} favorites
+                        </Typography>
+                      </Box>
+                    )}
+                  </>
+                ) : (
+                  <Box p={2} textAlign="center">
+                    <Typography variant="body2" color="text.secondary">
+                      You haven't added any favorites yet.
+                    </Typography>
+                  </Box>
+                )}
+                
+                <Divider />
+                <MenuItem onClick={() => {
+                  handleFavoritesClose();
+                  navigate('/favorites');
+                }}>
+                  <Typography variant="body2" color="primary" fontWeight="medium">
+                    Manage All Favorites
+                  </Typography>
+                </MenuItem>
+              </Menu>
               
               {/* User menu */}
               <Box 

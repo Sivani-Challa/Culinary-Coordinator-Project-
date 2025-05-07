@@ -1,20 +1,42 @@
 // SearchResults.jsx
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Container, Typography, CircularProgress, IconButton } from '@mui/material';
+import { Box, Container, Typography, CircularProgress, IconButton, Snackbar, Alert } from '@mui/material';
 import { Visibility as VisibilityIcon, Favorite as FavoriteIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import Footer from '../footer/Footer';
+import { addToFavorites, checkIsFavorite } from '../../api/favoriteService';
+import LoginPopup from '../common/LoginPopup';
 
 const SearchResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const searchQuery = queryParams.get('query') || '';
-
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginPopupOpen, setLoginPopupOpen] = useState(false);
+  const [isAddingToFavorites, setIsAddingToFavorites] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Check login status
+  useEffect(() => {
+    const checkLoginStatus = () => {
+      const token = localStorage.getItem('token');
+      setIsLoggedIn(!!token);
+    };
+
+    checkLoginStatus();
+    window.addEventListener('storage', checkLoginStatus);
+    return () => {
+      window.removeEventListener('storage', checkLoginStatus);
+    };
+  }, []);
+
+  // Fetch search results
   useEffect(() => {
     const fetchSearchResults = async () => {
       if (!searchQuery) {
@@ -50,9 +72,81 @@ const SearchResults = () => {
     navigate(`/product/${id}`);
   };
 
-  const handleAddToFavorites = (id) => {
-    console.log('Adding to favorites:', id);
-    // Add to favorites logic here
+  const handleAddToFavorites = async (id) => {
+    // Check if user is logged in
+    if (!isLoggedIn) {
+      setLoginPopupOpen(true);
+      return;
+    }
+    
+    // Prevent multiple clicks
+    if (isAddingToFavorites) return;
+    
+    setIsAddingToFavorites(true);
+
+    try {
+      // Get the item from search results
+      const item = results.find(item => item.id === id);
+      if (!item) {
+        console.error('Item not found in search results');
+        setSnackbarMessage('Error: Item not found');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      // Check if it's already in favorites
+      const isAlreadyFavorite = await checkIsFavorite(id);
+      if (isAlreadyFavorite) {
+        setSnackbarMessage('Item is already in your favorites');
+        setSnackbarSeverity('info');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Add to favorites
+      const productName = item.itemname || 'Product';
+      const brand = item.brand || '';
+      const manufacturer = item.manufacturer || '';
+      
+      await addToFavorites(id, productName, brand, manufacturer);
+      
+      setSnackbarMessage('Successfully added to favorites');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      
+    } catch (error) {
+      console.error('Error adding to favorites:', error);
+      
+      // Handle specific error cases
+      if (error.message && error.message.includes('already in your favorites')) {
+        setSnackbarMessage('Item is already in your favorites');
+        setSnackbarSeverity('info');
+      } else if (error.response && error.response.status === 409) {
+        setSnackbarMessage('Item is already in your favorites');
+        setSnackbarSeverity('info');
+      } else {
+        setSnackbarMessage('Error updating favorites. Please try again.');
+        setSnackbarSeverity('error');
+      }
+      setSnackbarOpen(true);
+    } finally {
+      setIsAddingToFavorites(false);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+  
+  const handleCloseLoginPopup = () => {
+    setLoginPopupOpen(false);
+  };
+  
+  const handleLoginSuccess = () => {
+    setLoginPopupOpen(false);
+    // You might want to refresh the page or just set isLoggedIn to true
+    setIsLoggedIn(true);
   };
 
   return (
@@ -205,6 +299,29 @@ const SearchResults = () => {
             </>
           )}
         </Box>
+        {/* Add Snackbar for messages */}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert 
+            onClose={handleCloseSnackbar} 
+            severity={snackbarSeverity}
+            sx={{ width: '100%' }}
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+        
+        {/* Login Popup */}
+        <LoginPopup
+          open={loginPopupOpen}
+          onClose={handleCloseLoginPopup}
+          onLogin={handleLoginSuccess}
+          showLoginButton={true}
+        />
       </Container>
       <Footer />
     </>
