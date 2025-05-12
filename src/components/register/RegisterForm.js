@@ -10,6 +10,7 @@ const RegisterSchema = Yup.object().shape({
   lastName: Yup.string().required('Last name is required'),
   email: Yup.string().email('Invalid email format').required('Email is required'),
   password: Yup.string().required('Password is required'),
+  countryCode: Yup.string().required('Country code is required'),
   phone: Yup.string()
     .matches(/^[6-9]{1}[0-9]{9}$/, "Phone must be 10 digits starting with 6-9")
     .required('Phone is required'),
@@ -37,6 +38,25 @@ const securityQuestions = [
   "What is the name of your favorite childhood friend?"
 ];
 
+// Country code options
+const countryCodes = [
+  '+91', // India
+  '+1',  // USA/Canada
+  '+44', // UK
+  '+61', // Australia
+  '+65', // Singapore
+  '+971', // UAE
+  '+86', // China
+  '+49', // Germany
+  '+33', // France
+  '+81', // Japan
+  '+82', // South Korea
+  '+7',  // Russia
+  '+55', // Brazil
+  '+27', // South Africa
+  '+64', // New Zealand
+];
+
 const RegisterForm = () => {
   const [submitStatus, setSubmitStatus] = useState({ open: false, message: '', severity: 'success' });
 
@@ -44,7 +64,7 @@ const RegisterForm = () => {
     try {
       console.log('Preparing to submit registration data:', values);
       
-      // Add headers for better debugging
+      // Submit the values directly - backend expects countryCode and phone separately
       const response = await axios.post('http://localhost:8082/register', values, {
         headers: {
           'Content-Type': 'application/json',
@@ -112,6 +132,7 @@ const RegisterForm = () => {
           lastName: '',
           email: '',
           password: '',
+          countryCode: '+91', // Default to India country code
           phone: '',
           address: '',
           state: '',
@@ -173,16 +194,46 @@ const RegisterForm = () => {
               sx={{ mb: 2 }}
             />
             
-            <Field
-              name="phone"
-              placeholder="Phone"
-              variant="outlined"
-              fullWidth
-              as={TextField}
-              error={touched.phone && Boolean(errors.phone)}
-              helperText={touched.phone && errors.phone}
-              sx={{ mb: 2 }}
-            />
+            {/* Phone with Country Code */}
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <FormControl 
+                sx={{ width: '35%' }} 
+                variant="outlined"
+                error={touched.countryCode && Boolean(errors.countryCode)}
+              >
+                <InputLabel id="country-code-label">Country Code</InputLabel>
+                <Select
+                  labelId="country-code-label"
+                  id="countryCode"
+                  name="countryCode"
+                  value={values.countryCode || '+91'}
+                  label="Country Code"
+                  onChange={(e) => setFieldValue('countryCode', e.target.value)}
+                  onBlur={handleBlur}
+                  displayEmpty
+                  renderValue={(selected) => selected}
+                >
+                  {countryCodes.map((code) => (
+                    <MenuItem key={code} value={code}>
+                      {code}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {touched.countryCode && errors.countryCode && (
+                  <FormHelperText>{errors.countryCode}</FormHelperText>
+                )}
+              </FormControl>
+              
+              <Field
+                name="phone"
+                placeholder="Phone Number"
+                variant="outlined"
+                fullWidth
+                as={TextField}
+                error={touched.phone && Boolean(errors.phone)}
+                helperText={touched.phone && errors.phone}
+              />
+            </Box>
             
             <Field
               name="address"

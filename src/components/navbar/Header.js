@@ -5,8 +5,6 @@ import {
   Typography, 
   Box, 
   IconButton, 
-  TextField, 
-  InputAdornment,
   Menu,
   MenuItem,
   Avatar,
@@ -20,7 +18,6 @@ import {
   useLocation 
 } from 'react-router-dom';
 import { 
-  Search, 
   Person, 
   AccountCircle,
   Favorite as FavoriteIcon,
@@ -29,10 +26,26 @@ import {
 } from '@mui/icons-material';
 import { AuthContext } from '../context/AuthContext';
 
+// Helper function to extract userId from JWT token
+const getUserIdFromToken = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+
+    const payload = JSON.parse(jsonPayload);
+    return payload.userId || payload.id || payload.sub;
+  } catch (error) {
+    console.error("Error extracting user ID from token:", error);
+    return null;
+  }
+};
+
 const Header = () => {
   // Use context directly instead of props
   const { isLoggedIn, logout } = useContext(AuthContext);
-  const [searchQuery, setSearchQuery] = useState('');
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [favorites, setFavorites] = useState([]);
@@ -42,11 +55,8 @@ const Header = () => {
   
   // State for user dropdown menu
   const [anchorEl, setAnchorEl] = useState(null);
-  // State for favorites menu
-  const [favAnchorEl, setFavAnchorEl] = useState(null);
   
   const open = Boolean(anchorEl);
-  const favOpen = Boolean(favAnchorEl);
   
   // Fetch user data from backend when component mounts or isLoggedIn changes
   useEffect(() => {
@@ -93,8 +103,16 @@ const Header = () => {
           console.error('No auth token found');
           return;
         }
+
+        // Extract userId from token
+        const userId = getUserIdFromToken(token);
+        if (!userId) {
+          console.error('Could not extract user ID from token');
+          return;
+        }
         
-        const response = await fetch('http://localhost:8083/favorite/list', {
+        // Use the correct endpoint with proper URL formatting
+        const response = await fetch(`http://localhost:8083/favorite/user/${userId}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -108,8 +126,21 @@ const Header = () => {
         }
         
         const data = await response.json();
-        console.log('Fetched favorites:', data);
-        setFavorites(Array.isArray(data) ? data : []);
+        console.log('Raw favorites data:', JSON.stringify(data, null, 2));
+        
+        // Ensure proper normalization based on actual field names
+        const normalizedFavorites = Array.isArray(data) ? data.map(item => ({
+          favoriteId: item.favoriteId,
+          id: item.itemId || item.id, 
+          productId: item.itemId || item.id,
+          itemId: item.itemId || item.id,
+          name: item.itemName || item.name,
+          brand: item.brand,
+          manufacturer: item.manufacturer
+        })) : [];
+        
+        console.log('Normalized favorites:', normalizedFavorites);
+        setFavorites(normalizedFavorites);
       } catch (error) {
         console.error('Failed to fetch favorites:', error);
         setFavorites([]);
@@ -121,21 +152,6 @@ const Header = () => {
     fetchFavorites();
   }, [isLoggedIn, location.pathname]); // Re-fetch when route changes
   
-  // Get current location (path) to check if we're on login/register page
-  const isLoginOrRegisterPage = location.pathname === '/login' || location.pathname === '/register';
-  
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
-  
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && searchQuery.trim()) {
-      handleSearch();
-    }
-  };
-
   // User menu handlers
   const handleUserMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -145,26 +161,11 @@ const Header = () => {
     setAnchorEl(null);
   };
   
-  // Favorites menu handlers
+  // Favorites direct navigation handler
   const handleFavoritesClick = (event) => {
-    event.preventDefault(); // Prevent immediate navigation
-    
-    if (favorites.length > 0) {
-      setFavAnchorEl(event.currentTarget);
-    } else {
-      // If no favorites, just navigate to favorites page
-      navigate('/favorites');
-    }
-  };
-  
-  const handleFavoritesClose = () => {
-    setFavAnchorEl(null);
-  };
-  
-  const handleFavoriteItemClick = (favorite) => {
-    handleFavoritesClose();
-    // Navigate to the product detail page for the selected favorite
-    navigate(`/product/${favorite.productId || favorite.id}`);
+    event.preventDefault(); // Prevent default action
+    // Navigate directly to favorites page
+    navigate('/favorites');
   };
   
   const handleLogout = () => {
@@ -178,6 +179,20 @@ const Header = () => {
     navigate(path);
   };
 
+  // Handle logo click - Reset search state and navigate home
+  const handleLogoClick = (e) => {
+    e.preventDefault(); // Prevent the default Link behavior
+    
+    // Reset the search state
+    if (location.pathname === '/') {
+      // If we're already on home page, reload to clear search state
+      window.location.href = '/';
+    } else {
+      // Otherwise just navigate to home
+      navigate('/');
+    }
+  };
+
   // Display name logic
   const displayName = userData?.username || 
                      userData?.name || 
@@ -187,14 +202,26 @@ const Header = () => {
     <AppBar 
       position="sticky" 
       sx={{ 
-        backgroundColor: '#69359C', // Deep purple with a blue undertone.
+        backgroundColor: '#69359C', // Updated to specified purple color
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)' // Subtle shadow for depth
       }}
     >
       <Toolbar>
         {/* Left side: Logo and App Name */}
         <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-          <Link to="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+          {/* Modified to use onClick handler instead of just Link */}
+          <Box 
+            component="a" 
+            href="/" 
+            onClick={handleLogoClick}
+            sx={{
+              textDecoration: 'none', 
+              color: 'inherit', 
+              display: 'flex', 
+              alignItems: 'center',
+              cursor: 'pointer'
+            }}
+          >
             <img
               src={'/logo.png'}
               alt="Culinary Mart"
@@ -203,60 +230,19 @@ const Header = () => {
             <Typography variant="h6" component="div" style={{ fontWeight: 'bold' }}>
               Culinary Mart
             </Typography>
-          </Link>
-        </Box>
-        
-        {/* Center: Search Bar - Only visible if not on login/register page */}
-        {!isLoginOrRegisterPage && (
-          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 5, justifyContent: 'center' }}>
-            <TextField
-              variant="outlined"
-              placeholder="Search"
-              size="small"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={handleSearch} edge="end">
-                      <Search />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                backgroundColor: 'white',
-                borderRadius: '20px',
-                width: '50%',
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '20px',
-                  paddingRight: '8px',
-                  '& fieldset': {
-                    border: 'none',
-                  },
-                },
-                '& input': {
-                  color: 'black',
-                }
-              }}
-            />
           </Box>
-        )}
+        </Box>
         
         {/* Right side: Login/Signup or User Menu */}
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           {isLoggedIn ? (
             <>
-              {/* Favorites Icon with Badge for logged-in users */}
+              {/* Favorites Icon with Badge - Direct navigation to favorites page */}
               <IconButton 
                 color="inherit" 
                 onClick={handleFavoritesClick}
                 sx={{ mr: 1 }}
                 aria-label="favorites"
-                aria-controls={favOpen ? "favorites-menu" : undefined}
-                aria-haspopup="true"
-                aria-expanded={favOpen ? "true" : undefined}
               >
                 <Badge 
                   badgeContent={favoritesLoading ? '...' : favorites.length} 
@@ -266,90 +252,6 @@ const Header = () => {
                   <FavoriteIcon />
                 </Badge>
               </IconButton>
-              
-              {/* Favorites dropdown menu */}
-              <Menu
-                id="favorites-menu"
-                anchorEl={favAnchorEl}
-                open={favOpen}
-                onClose={handleFavoritesClose}
-                MenuListProps={{
-                  'aria-labelledby': 'favorites-button',
-                }}
-                PaperProps={{
-                  style: {
-                    maxHeight: 300,
-                    width: '300px',
-                  },
-                }}
-              >
-                <Box p={1}>
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    My Favorites ({favorites.length})
-                  </Typography>
-                </Box>
-                <Divider />
-                
-                {favoritesLoading ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-                    <CircularProgress size={24} />
-                  </Box>
-                ) : favorites.length > 0 ? (
-                  <>
-                    {favorites.slice(0, 5).map((favorite) => (
-                      <MenuItem 
-                        key={favorite.id || favorite.productId} 
-                        onClick={() => handleFavoriteItemClick(favorite)}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                          {favorite.image && (
-                            <img 
-                              src={favorite.image} 
-                              alt={favorite.name || favorite.title || 'Product'} 
-                              style={{ width: 40, height: 40, marginRight: 10, objectFit: 'contain' }}
-                            />
-                          )}
-                          <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
-                            {favorite.name || favorite.title || 'Product Item'}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                    
-                    {favorites.length > 5 && (
-                      <Box p={1} textAlign="center">
-                        <Typography 
-                          variant="body2" 
-                          color="primary" 
-                          onClick={() => {
-                            handleFavoritesClose();
-                            navigate('/favorites');
-                          }}
-                          sx={{ cursor: 'pointer' }}
-                        >
-                          View all {favorites.length} favorites
-                        </Typography>
-                      </Box>
-                    )}
-                  </>
-                ) : (
-                  <Box p={2} textAlign="center">
-                    <Typography variant="body2" color="text.secondary">
-                      You haven't added any favorites yet.
-                    </Typography>
-                  </Box>
-                )}
-                
-                <Divider />
-                <MenuItem onClick={() => {
-                  handleFavoritesClose();
-                  navigate('/favorites');
-                }}>
-                  <Typography variant="body2" color="primary" fontWeight="medium">
-                    Manage All Favorites
-                  </Typography>
-                </MenuItem>
-              </Menu>
               
               {/* User menu */}
               <Box 

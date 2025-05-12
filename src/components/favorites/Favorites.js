@@ -2,78 +2,67 @@ import React, { useEffect, useState } from 'react';
 import { Container, Typography, Box, CircularProgress, Paper, Button, IconButton, Tooltip } from '@mui/material';
 import { ArrowBack, Visibility, Delete } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
-import { getFavorites, removeFromFavorites } from '../../api/favoriteService';
+import { getFavorites, removeFromFavorites, normalizeProductId } from '../../api/favoriteService';
 
 const Favorites = () => {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const fetchFavorites = async () => {
     setLoading(true);
     try {
       const data = await getFavorites();
-      console.log('Complete unfiltered favorites data:', data);
-      
-      // Make sure we're handling the data structure correctly
-      let favoriteItems = [];
-      if (Array.isArray(data)) {
-        favoriteItems = data;
-      } else if (data && data.data && Array.isArray(data.data)) {
-        favoriteItems = data.data;
-      } else {
-        favoriteItems = [];
+
+      if (!data || data.length === 0) {
+        setFavorites([]);
+        setError(null);
+        setLoading(false);
+        return;
       }
 
-      // Filter out duplicates based on product ID
-      const uniqueFavorites = [];
-      const seenKeys = new Set();
-      
-      favoriteItems.forEach(item => {
-        // Use product name as fallback if ID is not available
-        const key = item.productId || (item.id ? String(item.id) : item.name);
-        if (key && !seenKeys.has(key)) {
-          seenKeys.add(key);
-          uniqueFavorites.push(item);
-        }
-      });
-      
-      console.log('Filtered favorites data:', uniqueFavorites);
-      setFavorites(uniqueFavorites);
+      // Normalize itemId before setting favorites
+      const cleaned = data.map((item) => ({
+        ...item,
+        normalizedItemId: normalizeProductId(item.itemId || item.id)
+      }));
+
+      setFavorites(cleaned);
       setError(null);
     } catch (err) {
-      console.error('Error in component while fetching favorites:', err);
+      console.error('Error fetching favorites:', err);
       setError('Failed to load favorites. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
-  
+
   useEffect(() => {
     fetchFavorites();
   }, []);
 
   const handleRemoveFromFavorites = async (favoriteId) => {
-    console.log('Attempting to remove favorite with ID:', favoriteId);
+    if (!favoriteId) return;
     try {
+      setLoading(true);
       await removeFromFavorites(favoriteId);
-      console.log('Successfully removed favorite');
-      
-      // Refresh the favorites list after removal
-      fetchFavorites();
-    } catch (error) {
-      console.error('Error removing from favorites:', error);
+      await fetchFavorites();
+    } catch (err) {
+      console.error('Error removing favorite:', err);
+      setError('Failed to remove favorite. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box 
+      <Box
         component={RouterLink}
-        to="/" 
-        sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        to="/"
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
           mb: 2,
           color: 'primary.main',
           textDecoration: 'none'
@@ -107,29 +96,34 @@ const Favorites = () => {
         </Paper>
       ) : (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'flex-start' }}>
-          {favorites.map((item, index) => (
+          {favorites.map((item) => (
             <Box
-              key={item.favoriteId || `favorite-${index}`}
+              key={item.favoriteId || `favorite-${item.normalizedItemId}`}
               sx={{
-                width: 'calc(25% - 12px)', // 4 cards per row with gap
+                width: 'calc(25% - 12px)',
                 minWidth: '230px',
                 '@media (max-width: 900px)': {
-                  width: 'calc(50% - 8px)', // 2 cards per row on medium screens
+                  width: 'calc(50% - 8px)',
                 },
                 '@media (max-width: 600px)': {
-                  width: '100%', // 1 card per row on small screens
+                  width: '100%',
                 },
               }}
             >
               <Box
                 sx={{
-                  height: '180px', // Fixed height for all cards
+                  height: '180px',
                   display: 'flex',
                   flexDirection: 'column',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: 1,
-                  backgroundColor: 'white',
-                  overflow: 'hidden'
+                  border: '1px solid rgba(230, 200, 180, 0.5)',
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255, 250, 240, 0.85)',
+                  boxShadow: '0 2px 8px rgba(180, 140, 120, 0.15)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    border: '1px solid rgba(210, 160, 130, 0.8)',
+                    boxShadow: '0 4px 12px rgba(180, 140, 120, 0.25)',
+                  }
                 }}
               >
                 <Box sx={{
@@ -140,72 +134,87 @@ const Favorites = () => {
                   justifyContent: 'space-between'
                 }}>
                   <Box>
-                    <Typography 
-                      variant="subtitle1" 
-                      component="h2" 
-                      sx={{ 
-                        fontWeight: 'medium',
+                    <Typography
+                      sx={{
+                        fontWeight: '600',
+                        maxHeight: '3em',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
-                        lineHeight: 1.2,
-                        mb: 0.5,
+                        lineHeight: '1.5em',
                         wordBreak: 'break-word',
-                        hyphens: 'auto'
+                        color: '#000000',
                       }}
                     >
-                      {item.name || item.itemname || 'Unknown Product'}
+                      {item.itemName || item.name || 'Unknown Product'}
                     </Typography>
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary"
+
+                    <Typography
+                      variant="body2"
                       sx={{
-                        mb: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+                        mt: 1,
+                        fontWeight: '500',
+                        color: '#000000',
                       }}
                     >
-                      {item.brand || item.manufacturer || ''}
+                      {item.brand || item.manufacturer || 'Brand Not Available'}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 'auto' }}>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
                     <Tooltip title="View Product">
-                    <IconButton 
-                      component={RouterLink} 
-                      to={`/product/${item.productId || item.id}`}
-                      state={{ fromFavorites: true }}
-                      sx={{
-                        color: 'white',
-                        backgroundColor: 'blue',
-                        '&:hover': {
-                          backgroundColor: '#1565c0'
-                        },
-                        width: 36,
-                        height: 36
-                      }}
-                    >
-                      <Visibility sx={{ fontSize: '20px' }} />
-                    </IconButton>
+                      <IconButton
+                        component={RouterLink}
+                        to={`/product/${encodeURIComponent(item.normalizedItemId)}`}
+                        state={{
+                          fromFavorites: true,
+                          favoriteData: item
+                        }}
+                        sx={{
+                          color: 'white',
+                          backgroundColor: 'blue',
+                          '&:hover': {
+                            backgroundColor: '#1565c0'
+                          },
+                          width: 36,
+                          height: 36
+                        }}
+                        onClick={() => {
+                          try {
+                            localStorage.setItem('last_viewed_product', JSON.stringify({
+                              id: item.normalizedItemId,
+                              name: item.itemName || item.name,
+                              brand: item.brand,
+                              manufacturer: item.manufacturer,
+                              source: 'favorites',
+                              timestamp: new Date().toISOString()
+                            }));
+                          } catch (e) {
+                            console.error('Failed to store product data in localStorage:', e);
+                          }
+                        }}
+                      >
+                        <Visibility sx={{ fontSize: '20px' }} />
+                      </IconButton>
                     </Tooltip>
-                    
+
                     <Tooltip title="Remove from Favorites">
-                    <IconButton 
-                      onClick={() => handleRemoveFromFavorites(item.favoriteId || item.id)}
-                      sx={{
-                        color: 'white',
-                        backgroundColor: 'error.main',
-                        '&:hover': {
-                          backgroundColor: 'error.dark'
-                        },
-                        width: 36,
-                        height: 36
-                      }}
-                    >
-                      <Delete sx={{ fontSize: '20px' }} />
-                    </IconButton>
+                      <IconButton
+                        onClick={() => handleRemoveFromFavorites(item.favoriteId)}
+                        sx={{
+                          color: 'white',
+                          backgroundColor: 'error.main',
+                          '&:hover': {
+                            backgroundColor: 'error.dark'
+                          },
+                          width: 36,
+                          height: 36
+                        }}
+                      >
+                        <Delete sx={{ fontSize: '20px' }} />
+                      </IconButton>
                     </Tooltip>
                   </Box>
                 </Box>
