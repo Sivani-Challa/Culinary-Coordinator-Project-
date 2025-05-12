@@ -222,17 +222,70 @@ const Home = () => {
     setSnackbarOpen(false);
   };
 
+  // Add global styles to handle the background properly
+  useEffect(() => {
+    // Create a style element
+    const style = document.createElement('style');
+    style.textContent = `
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        overflow-x: hidden;
+      }
+      body {
+        background-image: url('/homebg20.jpeg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+      }
+    `;
+    // Append style to head
+    document.head.appendChild(style);
+
+    // Clean up function
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
-    <>
-      <Container maxWidth="lg">
+    <Box
+      sx={{
+        minHeight: '100vh',
+        width: '100%',
+        margin: 0,
+        padding: 0,
+        boxSizing: 'border-box',
+      }}
+    >
+      <Container 
+        maxWidth="lg"
+        sx={{
+          backgroundColor: 'transparent',
+          padding: '20px',
+          marginTop: '20px',
+          marginBottom: '20px',
+        }}
+      >
         {/* Welcome message */}
-        <Box sx={{ textAlign: 'center', marginBottom: '20px', mt: 4 }}>
+        <Box sx={{ 
+          textAlign: 'center', 
+          marginBottom: '20px', 
+          mt: 4,
+          backgroundColor: 'rgba(255, 255, 255, 0.7)',
+          padding: '20px',
+          borderRadius: '8px',
+        }}>
           <Typography
             variant="h4"
             component="h1"
             sx={{
               marginBottom: '10px',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              color: '#000000',
             }}
           >
             Welcome to Culinary Mart!
@@ -240,7 +293,7 @@ const Home = () => {
 
           {/* Display profile info if user is logged in */}
           {isLoggedIn && userProfile && (
-            <Typography variant="h6" sx={{ marginBottom: '20px' }}>
+            <Typography variant="h6" sx={{ marginBottom: '20px', color: '#000000' }}>
               Welcome, {userProfile.name || 'User'}!
             </Typography>
           )}
@@ -248,154 +301,186 @@ const Home = () => {
           <Typography
             variant="h6"
             sx={{
-              marginBottom: '20px'
+              marginBottom: '20px',
+              color: '#000000'
             }}
           >
             Discover a wide variety of items available at Culinary Mart. Browse through the best offers and manage your favorites.
           </Typography>
         </Box>
 
-        <Typography
-          variant="h5"
-          component="h2"
-          sx={{
-            marginBottom: '16px',
-            fontWeight: 'bold'
-          }}
-        >
-          Featured Items
-        </Typography>
+        <Box sx={{ 
+          backgroundColor: 'rgba(255, 255, 255, 0.2)', // Very light background
+          padding: '20px',
+          marginBottom: '20px',
+          borderRadius: '8px',
+        }}>
+          <Typography
+            variant="h5"
+            component="h2"
+            sx={{
+              marginBottom: '16px',
+              fontWeight: 'bold',
+              color: '#000000',
+              backgroundColor: 'rgba(255, 255, 255, 0.7)',
+              display: 'inline-block',
+              padding: '5px 15px',
+              borderRadius: '4px',
+            }}
+          >
+            Featured Items
+          </Typography>
 
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : error ? (
-          <Box sx={{ textAlign: 'center', color: 'error.main', p: 2 }}>
-            <Typography>{error}</Typography>
-          </Box>
-        ) : (
-          <>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'flex-start' }}>
-              {getCurrentItems().map((item, index) => (
-                <Box
-                  key={item.id || index}
-                  sx={{
-                    width: 'calc(25% - 12px)', // 4 cards per row with gap
-                    minWidth: '230px',
-                    '@media (max-width: 900px)': {
-                      width: 'calc(50% - 8px)', // 2 cards per row on medium screens
-                    },
-                    '@media (max-width: 600px)': {
-                      width: '100%', // 1 card per row on small screens
-                    },
-                  }}
-                >
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Box sx={{ textAlign: 'center', color: 'error.main', p: 2 }}>
+              <Typography>{error}</Typography>
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'flex-start' }}>
+                {getCurrentItems().map((item, index) => (
                   <Box
+                    key={item.id || index}
                     sx={{
-                      height: '180px', // Fixed height for all cards
-                      display: 'flex',
-                      flexDirection: 'column',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: 1,
-                      backgroundColor: 'white',
-                      overflow: 'hidden'
+                      width: 'calc(25% - 12px)', // 4 cards per row with gap
+                      minWidth: '230px',
+                      '@media (max-width: 900px)': {
+                        width: 'calc(50% - 8px)', // 2 cards per row on medium screens
+                      },
+                      '@media (max-width: 600px)': {
+                        width: '100%', // 1 card per row on small screens
+                      },
                     }}
                   >
-                    <Box sx={{
-                      padding: 2,
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between'
-                    }}>
-                      <Box>
-                        <Typography
-                          sx={{
-                            fontWeight: 'medium',
-                            maxHeight: '80px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            wordBreak: 'break-word'
-                          }}
-                        >
-                          {item.itemname || 'No Name Available'}
-                        </Typography>
-
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            mt: 1,
-                            color: 'text.secondary'
-                          }}
-                        >
-                          {item.brand || 'Brand Not Available'}
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{
+                    <Box
+                      sx={{
+                        height: '180px', // Fixed height for all cards
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        mt: 'auto'
+                        flexDirection: 'column',
+                        border: '1px solid rgba(255, 255, 255, 0.3)', // Light white border
+                        borderRadius: 1,
+                        backgroundColor: 'rgba(255, 255, 255, 0.5)', // Light transparent background like welcome message
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          border: '1px solid rgba(255, 255, 255, 0.8)', // More visible border on hover
+                          backgroundColor: 'rgba(255, 255, 255, 0.6)', // Slightly more opaque on hover
+                        }
+                      }}
+                    >
+                      <Box sx={{
+                        padding: 2,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
                       }}>
-                        <IconButton
-                          onClick={() => handleViewProduct(item.id)}
-                          sx={{
-                            color: 'white',
-                            backgroundColor: 'blue',
-                            '&:hover': {
-                              backgroundColor: '#1565c0'
-                            },
-                            width: 36,
-                            height: 36
-                          }}
-                        >
-                          <VisibilityIcon sx={{ fontSize: '20px' }} />
-                        </IconButton>
+                        <Box>
+                          <Typography
+                            sx={{
+                              fontWeight: '600', // Make it bolder for visibility
+                              maxHeight: '3em', // Approximately 2 lines of text
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2, // Limit to 2 lines
+                              WebkitBoxOrient: 'vertical',
+                              lineHeight: '1.5em', // Set line height for consistent height calculation
+                              wordBreak: 'break-word',
+                              color: '#000000', // Black
+                            }}
+                          >
+                            {item.itemname || 'No Name Available'}
+                          </Typography>
 
-                        <IconButton
-                          onClick={() => handleAddToFavorites(item.id)}
-                          sx={{
-                            color: 'white',
-                            backgroundColor: 'purple',
-                            '&:hover': {
-                              backgroundColor: '#9c27b0'
-                            },
-                            width: 36,
-                            height: 36
-                          }}
-                        >
-                          <FavoriteIcon sx={{ fontSize: '20px' }} />
-                        </IconButton>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              mt: 1,
+                              fontWeight: '500', // Semi-bold for visibility
+                              color: '#000000', // Black
+                            }}
+                          >
+                            {item.brand || 'Brand Not Available'}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          mt: 'auto'
+                        }}>
+                          <IconButton
+                            onClick={() => handleViewProduct(item.id)}
+                            sx={{
+                              color: 'white',
+                              backgroundColor: 'blue',
+                              '&:hover': {
+                                backgroundColor: '#1565c0'
+                              },
+                              width: 36,
+                              height: 36
+                            }}
+                          >
+                            <VisibilityIcon sx={{ fontSize: '20px' }} />
+                          </IconButton>
+
+                          <IconButton
+                            onClick={() => handleAddToFavorites(item.id)}
+                            sx={{
+                              color: 'white',
+                              backgroundColor: 'purple',
+                              '&:hover': {
+                                backgroundColor: '#9c27b0'
+                              },
+                              width: 36,
+                              height: 36
+                            }}
+                          >
+                            <FavoriteIcon sx={{ fontSize: '20px' }} />
+                          </IconButton>
+                        </Box>
                       </Box>
                     </Box>
                   </Box>
-                </Box>
-              ))}
-            </Box>
+                ))}
+              </Box>
 
-            {/* Pagination */}
-            <Box sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              mt: 4,
-              mb: 4
-            }}>
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={handleChangePage}
-                color="primary"
-                showFirstButton
-                showLastButton
-              />
-            </Box>
-          </>
-        )}
+              {/* Pagination */}
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                mt: 4,
+                mb: 4
+              }}>
+                <Pagination
+                  count={totalPages}
+                  page={page}
+                  onChange={handleChangePage}
+                  color="primary"
+                  showFirstButton
+                  showLastButton
+                  sx={{
+                    '& .MuiPaginationItem-root': {
+                      color: '#000000', // Black
+                      backgroundColor: 'rgba(255, 255, 255, 0.5)', // Semi-transparent white
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(25, 118, 210, 0.8)', // Semi-transparent primary color
+                        color: 'white',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+            </>
+          )}
+        </Box>
+        
         {/* Snackbar for messages */}
         <Snackbar
           open={snackbarOpen}
@@ -420,7 +505,7 @@ const Home = () => {
         onLogin={handleLogin}
         showLoginButton={true}
       />
-    </>
+    </Box>
   );
 };
 

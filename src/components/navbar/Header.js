@@ -184,7 +184,13 @@ const Header = () => {
                      (userData?.email ? userData.email.split('@')[0] : 'Guest');
 
   return (
-    <AppBar position="sticky">
+    <AppBar 
+      position="sticky" 
+      sx={{ 
+        backgroundColor: '#69359C', // Deep purple with a blue undertone.
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)' // Subtle shadow for depth
+      }}
+    >
       <Toolbar>
         {/* Left side: Logo and App Name */}
         <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
