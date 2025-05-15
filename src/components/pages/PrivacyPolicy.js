@@ -1,7 +1,6 @@
 // src/components/pages/PrivacyPolicy.js
 import React from 'react';
 import { Container, Typography, Box, Paper, useTheme } from '@mui/material';
-import Footer from '../footer/Footer';
 
 const PrivacyPolicy = () => {
   const theme = useTheme();
@@ -131,7 +130,6 @@ const PrivacyPolicy = () => {
           </Box>
         </Paper>
       </Container>
-      <Footer />
     </>
   );
 };

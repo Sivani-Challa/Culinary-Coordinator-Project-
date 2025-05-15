@@ -1,7 +1,6 @@
 // src/components/pages/CookiePolicy.js
 import React from 'react';
 import { Container, Typography, Box, Paper, useTheme } from '@mui/material';
-import Footer from '../footer/Footer';
 
 const CookiePolicy = () => {
   const theme = useTheme();
@@ -119,7 +118,6 @@ const CookiePolicy = () => {
           </Box>
         </Paper>
       </Container>
-      <Footer />
     </>
   );
 };

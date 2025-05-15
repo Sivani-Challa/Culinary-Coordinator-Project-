@@ -336,11 +336,15 @@ const Home = () => {
     return filteredItems.slice(startIndex, endIndex);
   };
 
-  const handleChangePage = (event, value) => {
-    setPage(value);
-    // Scroll to top when changing page
-    window.scrollTo(0, 0);
-  };
+const handleChangePage = (event, value) => {
+  // First scroll to top immediately with highest priority
+  window.scrollTo(0, 0);
+  document.body.scrollTop = 0; // For Safari
+  document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+  
+  // Then update the page state
+  setPage(value);
+};
 
   const handleAddToFavorites = async (id) => {
     // Check if the user is logged in
