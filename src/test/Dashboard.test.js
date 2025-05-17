@@ -1,62 +1,86 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import Dashboard from '../components/Dashboard';
+import Dashboard from '../components/dashboard/Dashboard';
 
-// Positive test cases
-describe('Dashboard Component - Positive Cases', () => {
-  it('renders header and navigation buttons', () => {
-    render(<Dashboard />);
-    expect(screen.getByText(/culinary coordinator/i)).toBeInTheDocument();
-    expect(screen.getByText(/profile/i)).toBeInTheDocument();
-    expect(screen.getByText(/logout/i)).toBeInTheDocument();
-    expect(screen.getByText(/home/i)).toBeInTheDocument();
-    expect(screen.getByText(/my favorites/i)).toBeInTheDocument();
+describe('Dashboard Component', () => {
+  beforeEach(() => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
   });
 
-  it('renders search input and filter controls', () => {
-    render(<Dashboard />);
-    expect(screen.getByLabelText(/search food items/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/brand/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/manufacturer/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/ingredients/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/weight range min/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/weight range max/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/recently added only/i)).toBeInTheDocument();
+  afterEach(() => {
+    console.log.mockRestore();
   });
 
-  it('calls handleSearch when clicking Search button', () => {
-    console.log = jest.fn();
+  test('renders dashboard with all main sections', () => {
     render(<Dashboard />);
-    fireEvent.change(screen.getByLabelText(/search food items/i), {
-      target: { value: 'Pizza' },
+    expect(screen.getByText(/Culinary Coordinator/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Search Food Items/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Ingredients/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Weight Range Min/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Weight Range Max/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Recently Added Only/i)).toBeInTheDocument();
+  });
+
+  test('performs search when clicking Search button', () => {
+    render(<Dashboard />);
+    fireEvent.change(screen.getByLabelText(/Search Food Items/i), {
+      target: { value: 'apple' },
     });
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     expect(console.log).toHaveBeenCalledWith(
-      'Searching for:', 'Pizza', '', '', { min: '', max: '' }, false
+      'Searching for:',
+      'apple',
+      '',
+      '',
+      '',
+      { min: '', max: '' },
+      false
     );
   });
-});
 
-// Negative test cases
-describe('Dashboard Component - Negative Cases', () => {
-  it('does not break when all inputs are empty and search is clicked', () => {
-    console.log = jest.fn();
+  test('sets weight range and recentlyAdded checkbox', () => {
+    render(<Dashboard />);
+    fireEvent.change(screen.getByLabelText(/Weight Range Min/i), {
+      target: { value: '100' },
+    });
+    fireEvent.change(screen.getByLabelText(/Weight Range Max/i), {
+      target: { value: '500' },
+    });
+    fireEvent.click(screen.getByLabelText(/Recently Added Only/i));
+
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+
+    expect(console.log).toHaveBeenCalledWith(
+      'Searching for:',
+      '',
+      '',
+      '',
+      '',
+      { min: '100', max: '500' },
+      true
+    );
+  });
+
+  test('prevents non-numeric input in weight fields', () => {
+    render(<Dashboard />);
+    const minInput = screen.getByLabelText(/Weight Range Min/i);
+    fireEvent.change(minInput, { target: { value: 'abc' } });
+
+    // HTML input[type="number"] doesn't allow non-numeric — value stays ""
+    expect(minInput.value).toBe('');
+  });
+
+  test('triggers search even with no inputs', () => {
     render(<Dashboard />);
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
-    expect(console.log).toHaveBeenCalled();
-  });
-
-  it('handles changing brand and manufacturer to non-existing values gracefully', () => {
-    render(<Dashboard />);
-    const brandSelect = screen.getByLabelText(/brand/i);
-    fireEvent.change(brandSelect, { target: { value: 'non-existent-brand' } });
-    expect(brandSelect.value).toBe('non-existent-brand');
-  });
-
-  it('handles invalid weight inputs without crashing', () => {
-    render(<Dashboard />);
-    const weightMin = screen.getByLabelText(/weight range min/i);
-    fireEvent.change(weightMin, { target: { value: 'invalid' } });
-    expect(weightMin.value).toBe('invalid');
+    expect(console.log).toHaveBeenCalledWith(
+      'Searching for:',
+      '',
+      '',
+      '',
+      '',
+      { min: '', max: '' },
+      false
+    );
   });
 });

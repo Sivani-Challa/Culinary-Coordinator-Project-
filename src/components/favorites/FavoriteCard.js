@@ -40,7 +40,7 @@ const FavoriteCard = ({ item, onRemoveFromFavorites }) => {
           {name}
         </Typography>
         
-        {/* Brand/Manufacturer */}
+        {/* Brand */}
         <Typography 
           variant="body2" 
           color="text.secondary"
