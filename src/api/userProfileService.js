@@ -1,6 +1,7 @@
 import axios from 'axios';
+import Constants from '/Constants';
 
-const API_URL = 'http://localhost:8082/userprofile';  // Update with your user profile service URL
+const API_URL = Constants.API_URL;  // Update with your user profile service URL
 
 // Fetch user profile data
 export const getUserProfile = async (userId) => {

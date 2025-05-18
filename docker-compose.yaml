@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  culinary-app-ui:
+    image: culinary-app-ui:1.0
+    container_name: culinary-app-ui
+    ports:
+      - "3000:80"   # Exposes Nginx port 80 to host port 3000
+    restart: always
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge

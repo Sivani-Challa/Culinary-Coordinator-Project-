@@ -121,10 +121,26 @@ const ProfileEdit = () => {
       };
 
       // Only include security question fields if both are provided
-      if (values.securityQuestion && values.securityQuestionAnswer) {
-        updatedProfile.securityQuestion = values.securityQuestion;
-        updatedProfile.securityQuestionAnswer = values.securityQuestionAnswer;
-      }
+      // Ensure both securityQuestion and securityQuestionAnswer are filled together
+const onlyOneProvided =
+  (values.securityQuestion && !values.securityQuestionAnswer) ||
+  (!values.securityQuestion && values.securityQuestionAnswer);
+
+if (onlyOneProvided) {
+  setNotification({
+    open: true,
+    message: 'Both security question and answer must be filled to update security info.',
+    severity: 'error'
+  });
+  setSubmitting(false);
+  return;
+}
+
+if (values.securityQuestion && values.securityQuestionAnswer) {
+  updatedProfile.securityQuestion = values.securityQuestion;
+  updatedProfile.securityQuestionAnswer = values.securityQuestionAnswer;
+}
+
 
       console.log('Sending update request with data:', updatedProfile);
 
