@@ -74,7 +74,7 @@ const RegisterForm = () => {
       
       console.log('Registration successful! Server response:', response.data);
       
-      // Show success message
+      // Show SnackBar success message
       setSubmitStatus({
         open: true,
         message: 'Registration successful!',
@@ -83,6 +83,7 @@ const RegisterForm = () => {
       
       // Reset form after successful submission
       resetForm();
+      
     } catch (error) {
       console.error('Registration error details:', error);
       

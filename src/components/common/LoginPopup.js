@@ -95,22 +95,6 @@ const LoginPopup = ({ open, onClose, onLogin, showLoginButton }) => {
         sx: { borderRadius: 2 }
       }}
     >
-      {/* <DialogTitle id="login-required-dialog-title" sx={{ pb: 1 }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6" component="div">
-            {showLoginForm ? 'Quick Login' : 'Login Required'}
-          </Typography>
-          <IconButton
-            edge="end"
-            color="inherit"
-            onClick={onClose}
-            aria-label="close"
-            size="small"
-          >
-            <CloseIcon />
-          </IconButton>
-        </Box>
-      </DialogTitle> */}
       
       <DialogContent dividers>
         {showLoginForm ? (

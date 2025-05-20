@@ -18,10 +18,15 @@ const LoginForm = ({ onLogin }) => {
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
 
+
+  // Handle form submission
+  // This function is called when the form is submitted
   const handleSubmit = async (values, { setSubmitting }) => {
     setIsLoading(true);
     setLoginError(null);
     
+    // Perform login request
+    // This is where you would typically make an API call to log the user in
     try {
       const response = await fetch('http://localhost:8081/auth/login', {
         method: 'POST',
@@ -34,6 +39,8 @@ const LoginForm = ({ onLogin }) => {
         }),
       });
 
+      // Check if the response is ok (status code 200)
+      // If not, handle the error
       if (!response.ok) {
         let errorMessage = 'Login failed. Please check your credentials.';
         try{
@@ -53,11 +60,13 @@ const LoginForm = ({ onLogin }) => {
 
       }
 
+      // If the response is ok, parse the JSON data - successful login check
+      // and store the token in localStorage
       const data = await response.json(); // Ensure you parse the response as JSON
       console.log('Login successful:', data);
 
       // Log the token in the console
-      console.log('Token:', data.token);  // This will print the token to the console
+      console.log('Token:', data.token); 
       
       // Store the token and user data in localStorage
       localStorage.setItem('token', data.token);
@@ -66,13 +75,12 @@ const LoginForm = ({ onLogin }) => {
       // Create a user object instead of just passing the username
       const userData = { 
         username: data.userName,
-        // Include any other user fields from your API response
       };
       
       // Call the context login function directly
       login(userData, data.token);
       
-      // Also call the onLogin prop if provided
+      // Call the global context login method and notify parent component if onLogin prop was given.
       if (onLogin) {
         onLogin(userData, data.token);
       }

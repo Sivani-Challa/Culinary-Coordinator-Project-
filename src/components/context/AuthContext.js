@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('token');
       const userData = localStorage.getItem('user');
       
+      
       if (token) {
         setIsLoggedIn(true);
           if (userData) {
@@ -41,11 +42,12 @@ export const AuthProvider = ({ children }) => {
     
         checkLoginStatus();
 
-          // Add event listener for login events
+          // Add event listener for login events - to re-check login state when events are triggered
     const handleLoginEvent = () => {
       checkLoginStatus();
     };
     
+    //Listen for login status changes
     window.addEventListener('storage', handleLoginEvent);
     window.addEventListener('auth-login', handleLoginEvent);
     
