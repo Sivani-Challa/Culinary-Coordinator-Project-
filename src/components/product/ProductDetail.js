@@ -7,7 +7,6 @@ import {
   Button,
   Paper,
   CircularProgress,
-  Divider,
   IconButton,
   Snackbar,
   Alert
@@ -22,13 +21,15 @@ import { checkIsFavorite, getFavorites, normalizeProductId } from '../../api/fav
 import axios from 'axios';
 import LoginPopup from '../common/LoginPopup';
 import { addToFavorites } from '../../api/favoriteService';
+import ProductReviews from './ProductReviews';
 
 const ProductDetail = () => {
-  const { id: rawProductId } = useParams(); // Keep the raw ID for debugging
-  const productId = normalizeProductId(rawProductId); // Normalize it for use
+  const { id: rawProductId } = useParams();
+  const productId = normalizeProductId(rawProductId);
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Existing state
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,9 +41,7 @@ const ProductDetail = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const [errorDetails, setErrorDetails] = useState(null);
 
-  // Modified: Check if the user came from the favorites page - more reliable
   const fromFavorites = React.useMemo(() => {
-    // Only consider explicit indicators, not product source
     return (
       location.state?.fromFavorites === true ||
       location.pathname.includes('/favorite') ||
@@ -50,10 +49,8 @@ const ProductDetail = () => {
     );
   }, [location]);
 
-  // Check if user is logged in
   const isLoggedIn = !!localStorage.getItem('token');
 
-  // Function to get user ID from token
   const getUserIdFromToken = (token) => {
     try {
       const base64Url = token.split('.')[1];
@@ -113,8 +110,6 @@ const ProductDetail = () => {
     }
   }, [productId, isLoggedIn]);
 
-
-  // New function to find product in favorites
   const findProductInFavorites = async (id) => {
     try {
       const favorites = await getFavorites();
@@ -158,7 +153,6 @@ const ProductDetail = () => {
           setIsFavorite(true);
           setError(null);
           setErrorDetails(null);
-          // ✅ Don't return - continue to fetch full data
         }
 
         // Step 2: Fallback from localStorage
@@ -176,7 +170,6 @@ const ProductDetail = () => {
             setIsFavorite(true);
             setError(null);
             setErrorDetails(null);
-            // ✅ Don't return
           }
         }
 
@@ -193,7 +186,6 @@ const ProductDetail = () => {
           setIsFavorite(true);
           setError(null);
           setErrorDetails(null);
-          // ✅ Don't return
         }
 
         // Step 4: Fetch full product from API
@@ -263,15 +255,11 @@ const ProductDetail = () => {
     }
   }, [productId, isLoggedIn, checkExistingFavorites, location, rawProductId]);
 
-
-  // Add this effect to log when route changes
   useEffect(() => {
-    // Log when the component mounts or route params change
     console.log('ProductDetail component route update:');
     console.log('- Raw URL parameter:', rawProductId);
     console.log('- Normalized product ID:', productId);
     console.log('- From favorites:', fromFavorites);
-
   }, [rawProductId, productId, fromFavorites]);
 
   const handleAddToFavorites = async () => {
@@ -284,9 +272,7 @@ const ProductDetail = () => {
     setIsAddingToFavorites(true);
 
     try {
-      // Extract the ID from the URL parameter if needed
       const urlProductId = productId || '';
-      // Use a clear hierarchy of possible ID sources
       const currentProductId = (product?.itemId && String(product.itemId).trim()) ||
         (product?.id && String(product.id).trim()) ||
         urlProductId;
@@ -325,7 +311,6 @@ const ProductDetail = () => {
     }
   };
 
-
   const handleBackClick = () => {
     if (fromFavorites) {
       navigate('/favorites');
@@ -343,9 +328,12 @@ const ProductDetail = () => {
     });
   };
 
-  // Snackbar close handler
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
+  };
+
+  const handleLoginRequired = () => {
+    setLoginPopupOpen(true);
   };
 
   if (loading) {
@@ -362,7 +350,6 @@ const ProductDetail = () => {
         <Paper elevation={3} sx={{ p: 3, textAlign: 'center' }}>
           <Typography color="error" variant="h6">{error}</Typography>
 
-          {/* Show detailed error information for debugging */}
           <Box sx={{ mt: 2, mb: 3, textAlign: 'left', p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Error Details:</Typography>
             <Typography variant="body2">Product ID: {rawProductId || 'None'}</Typography>
@@ -376,17 +363,10 @@ const ProductDetail = () => {
           </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-            <Button
-              variant="contained"
-              onClick={handleBackClick}
-            >
+            <Button variant="contained" onClick={handleBackClick}>
               {fromFavorites ? "Back to Favorites" : "Back to Products"}
             </Button>
-
-            <Button
-              variant="outlined"
-              onClick={() => window.location.reload()}
-            >
+            <Button variant="outlined" onClick={() => window.location.reload()}>
               Retry
             </Button>
           </Box>
@@ -406,11 +386,7 @@ const ProductDetail = () => {
           <Typography variant="body2">Path: {location.pathname}</Typography>
         </Box>
         <Box sx={{ mt: 2 }}>
-          <Button
-            variant="contained"
-            sx={{ mt: 2 }}
-            onClick={handleBackClick}
-          >
+          <Button variant="contained" sx={{ mt: 2 }} onClick={handleBackClick}>
             {fromFavorites ? "Back to Favorites" : "Back to Products"}
           </Button>
         </Box>
@@ -420,7 +396,7 @@ const ProductDetail = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Back button - Using the exact same approach as other pages */}
+      {/* Back button */}
       <Box
         component="div"
         onClick={handleBackClick}
@@ -437,63 +413,67 @@ const ProductDetail = () => {
         {fromFavorites ? "BACK TO FAVORITES" : "BACK TO PRODUCTS"}
       </Box>
 
-      {/* Product Detail Section */}
-      <Grid container spacing={4}>
-        <Grid item xs={12}>
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-              <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
-                {product.itemname || product.name || "Product Details"}
-              </Typography>
-              {/* MODIFIED: Always show the favorite button regardless of source */}
-              <IconButton
-                onClick={handleAddToFavorites}
-                disabled={isAddingToFavorites || isFavorite}
-                sx={{
-                  backgroundColor: isFavorite ? '#7b1fa2' : '#9c27b0',
-                  '&:hover': {
-                    backgroundColor: isFavorite ? '#7b1fa2' : '#7b1fa2'
-                  },
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                }}
-              >
-                {isFavorite ?
-                  <FavoriteIcon sx={{ color: 'white' }} /> :
-                  <FavoriteBorder sx={{ color: 'white' }} />
-                }
-              </IconButton>
-            </Box>
+      {/* Product Details Section - Full Width at Top */}
+      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+          <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
+            {product.itemname || product.name || "Product Details"}
+          </Typography>
+          <IconButton
+            onClick={handleAddToFavorites}
+            disabled={isAddingToFavorites || isFavorite}
+            sx={{
+              backgroundColor: isFavorite ? '#7b1fa2' : '#9c27b0',
+              '&:hover': {
+                backgroundColor: isFavorite ? '#7b1fa2' : '#7b1fa2'
+              },
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+            }}
+          >
+            {isFavorite ?
+              <FavoriteIcon sx={{ color: 'white' }} /> :
+              <FavoriteBorder sx={{ color: 'white' }} />
+            }
+          </IconButton>
+        </Box>
 
-            {/* MODIFIED: Product Details - Always display fields with empty strings as fallback */}
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
             <Typography variant="subtitle1">{`Brand: ${product.brand || ''}`}</Typography>
             <Typography variant="subtitle1">{`Manufacturer: ${product.manufacturer || ''}`}</Typography>
-
-            {/* Only show these fields if they exist */}
             {product.asins && <Typography variant="subtitle1">{`ASIN: ${product.asins}`}</Typography>}
             {product.categories && <Typography variant="subtitle1">{`Categories: ${product.categories}`}</Typography>}
             {product.weight && <Typography variant="subtitle1">{`Weight: ${product.weight}`}</Typography>}
             {product.ean && <Typography variant="subtitle1">{`EAN: ${product.ean}`}</Typography>}
-            <Divider sx={{ my: 2 }} />
-
-            {/* MODIFIED: Always show ingredients section, even if empty */}
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
+            {/* Ingredients Section */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="h6">Ingredients</Typography>
               <Typography variant="body1">{product.ingredients || 'No ingredients information available.'}</Typography>
             </Box>
-
-            {/* Last Updated */}
-            <Box sx={{ mt: 2 }}>
-              {product.dateUpdated && (
-                <Typography variant="body2" color="text.secondary">
-                  Last Updated: {formatDate(product.dateUpdated)}
-                </Typography>
-              )}
-            </Box>
-          </Box>
+          </Grid>
         </Grid>
-      </Grid>
+
+        {/* Last Updated */}
+        <Box sx={{ mt: 2 }}>
+          {product.dateUpdated && (
+            <Typography variant="body2" color="text.secondary">
+              Last Updated: {formatDate(product.dateUpdated)}
+            </Typography>
+          )}
+        </Box>
+      </Paper>
+
+      {/* Reviews Section - Full Width Below Product Details */}
+      <ProductReviews 
+        productId={productId}
+        isLoggedIn={isLoggedIn}
+        onLoginRequired={handleLoginRequired}
+      />
 
       {/* Snackbar for messages */}
       <Snackbar

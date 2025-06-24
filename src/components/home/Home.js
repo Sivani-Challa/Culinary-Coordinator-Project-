@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -16,13 +16,16 @@ import {
   FormGroup,
   FormControlLabel,
   Checkbox,
-  Grid
+  Grid,
+  Collapse
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
   Visibility as VisibilityIcon,
   Search as SearchIcon,
-  FilterList as FilterListIcon
+  FilterList as FilterListIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import LoginPopup from '../common/LoginPopup';
@@ -41,7 +44,6 @@ const Home = () => {
   const [loginPopupOpen, setLoginPopupOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [searchPlaceholder, setSearchPlaceholder] = useState('Search for items...');
-
 
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,16 +64,325 @@ const Home = () => {
     ingredients: []
   });
 
+  // Two-level filter expansion state - FIXED: Ensure all start as FALSE
+  const [expandedFilters, setExpandedFilters] = useState({
+    brands: false,
+    categories: false,
+    manufacturers: false,
+    ingredients: false
+  });
+
+  const [showMoreFilters, setShowMoreFilters] = useState({
+    brands: false,
+    categories: false,
+    manufacturers: false,
+    ingredients: false
+  });
+
+  // Track how many times "Show More" has been clicked for each filter
+  const [showMoreCount, setShowMoreCount] = useState({
+    brands: 0,
+    categories: 0,
+    manufacturers: 0,
+    ingredients: 0
+  });
+
   // Add state for Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+
+  // Configuration for how many items to show when collapsed
+  const COLLAPSED_ITEMS_COUNT = 5;
+  const SHOW_MORE_INCREMENT = 50; // Number of items to show when "Show More" is clicked
+
+  // Helper function to clean and validate filter items
+  const cleanAndValidateFilterItems = (items) => {
+    if (!Array.isArray(items)) return [];
+    
+    const cleaned = items
+      .filter(item => {
+        // Remove null, undefined, empty strings, and strings with only whitespace
+        if (!item || typeof item !== 'string' || item.trim() === '') {
+          return false;
+        }
+        
+        const trimmed = item.trim();
+        
+        // Skip very short items (less than 3 characters)
+        if (trimmed.length < 3) {
+          return false;
+        }
+        
+        // Skip items that are just punctuation, numbers, or symbols
+        if (/^[.,*()#\-+\s\d:;!@$%^&]+$/.test(trimmed)) {
+          return false;
+        }
+        
+        // Skip items that start with any punctuation or symbol
+        if (/^[.,*()#\-+:;!@$%^&\s]/.test(trimmed)) {
+          return false;
+        }
+        
+        // Skip items that are just "and" or start with "and" (sentence fragments)
+        if (/^and$/i.test(trimmed) || /^and\s/i.test(trimmed) || /^and\/or/i.test(trimmed)) {
+          return false;
+        }
+        
+        // Skip items that are just parentheses with content
+        if (/^\([^)]*\)$/.test(trimmed)) {
+          return false;
+        }
+        
+        // Skip items containing colons (usually labels or categories)
+        if (trimmed.includes(':')) {
+          return false;
+        }
+        
+        // Skip incomplete entries (ending with incomplete words or punctuation)
+        if (/\s(water|oil|acid|extract|powder|flavor|salt)$/i.test(trimmed) && trimmed.length > 30) {
+          return false;
+        }
+        
+        // Skip very long manufacturing/processing statements
+        if (trimmed.length > 50 && (/manufactured|processed|facility|contains/i.test(trimmed))) {
+          return false;
+        }
+        
+        // Skip common connecting words and phrases that are not ingredients
+        const nonIngredientWords = [
+          /^and$/i,
+          /^or$/i,
+          /^the$/i,
+          /^of$/i,
+          /^in$/i,
+          /^with$/i,
+          /^from$/i,
+          /^by$/i,
+          /^for$/i,
+          /^as$/i,
+          /^at$/i,
+          /^on$/i,
+          /^to$/i
+        ];
+        
+        for (const pattern of nonIngredientWords) {
+          if (pattern.test(trimmed)) {
+            return false;
+          }
+        }
+        
+        // Skip nutritional disclaimers and common non-ingredient text
+        const nonIngredientPatterns = [
+          /not a source of/i,
+          /contains.*fat/i,
+          /serving.*contains/i,
+          /\d+ml/i,
+          /ingredients not in/i,
+          /^organic\.?$/i,
+          /trans fat/i,
+          /per serving/i,
+          /bht added/i,
+          /preserve freshness/i,
+          /packaging material/i,
+          /contains milk/i,
+          /contains.*ingredients/i,
+          /dietary.*amount/i,
+          /cholesterol/i,
+          /soy ingredients/i,
+          /tomato paste/i,
+          /^contains:/i,
+          /^contains\s/i,
+          /add food enhancer/i,
+          /manufactured in.*facility/i,
+          /processes products/i,
+          /tree nuts/i,
+          /to protect taste/i,
+          /as a preservative/i
+        ];
+        
+        for (const pattern of nonIngredientPatterns) {
+          if (pattern.test(trimmed)) {
+            return false;
+          }
+        }
+        
+        // Skip items that are mostly punctuation (more than 30% punctuation)
+        const punctuationCount = (trimmed.match(/[.,*()#\-+:;!@$%^&]/g) || []).length;
+        const punctuationRatio = punctuationCount / trimmed.length;
+        if (punctuationRatio > 0.3) {
+          return false;
+        }
+        
+        // Only keep items that look like actual ingredient names
+        // Must contain at least one letter and be reasonably long
+        if (!/[a-zA-Z]/.test(trimmed) || trimmed.length < 2) {
+          return false;
+        }
+        
+        return true;
+      })
+      .map(item => {
+        let cleaned = item.trim();
+        
+        // Remove trailing special characters, asterisks, periods, etc.
+        cleaned = cleaned.replace(/[.,;!*#+\-_^&%$@()]+$/, '');
+        
+        // Remove leading special characters
+        cleaned = cleaned.replace(/^[.,;!*#+\-_^&%$@()]+/, '');
+        
+        // Clean up extra spaces
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+        
+        // Convert to proper case (first letter uppercase, rest lowercase for comparison)
+        // But keep the original casing for display
+        return cleaned;
+      })
+      .filter(item => item.length > 0) // Remove empty strings after cleaning
+      .filter((item, index, array) => {
+        // Remove duplicates with case-insensitive comparison and special character normalization
+        const normalize = (str) => {
+          return str
+            .toLowerCase()
+            .replace(/[.,;!*#+\-_^&%$@()]/g, '') // Remove all special characters
+            .replace(/\s+/g, ' ') // Normalize spaces
+            .trim();
+        };
+        
+        const normalizedCurrent = normalize(item);
+        
+        // Skip if normalized item is too short or is just a common word
+        if (normalizedCurrent.length < 3 || /^(and|or|the|of|in|with|from|by|for|as|at|on|to)$/i.test(normalizedCurrent)) {
+          return false;
+        }
+        
+        // Find the first occurrence of this normalized item
+        const firstIndex = array.findIndex(el => 
+          normalize(el) === normalizedCurrent
+        );
+        
+        // Keep only the first occurrence
+        return firstIndex === index;
+      });
+    
+    // Sort: alphabetical first (case-insensitive), then items starting with numbers
+    const alphabetical = cleaned
+      .filter(item => /^[a-zA-Z]/.test(item))
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    
+    const withNumbers = cleaned
+      .filter(item => /^[0-9]/.test(item))
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    
+    return [...alphabetical, ...withNumbers];
+  };
+
+  // Get items to display based on show more state
+  const getItemsToDisplay = (filterType, items) => {
+    const showMore = showMoreFilters[filterType];
+    const clickCount = showMoreCount[filterType];
+    
+    if (showMore) {
+      // Calculate total items to show: initial 5 + (click count * 50)
+      const totalToShow = COLLAPSED_ITEMS_COUNT + (clickCount * SHOW_MORE_INCREMENT);
+      return items.slice(0, Math.min(totalToShow, items.length));
+    }
+    return items.slice(0, COLLAPSED_ITEMS_COUNT);
+  };
+
+  // Get show more button text
+  const getShowMoreButtonText = (filterType, items) => {
+    const showMore = showMoreFilters[filterType];
+    const clickCount = showMoreCount[filterType];
+    const totalItems = items.length;
+    const currentlyShowing = showMore 
+      ? Math.min(COLLAPSED_ITEMS_COUNT + (clickCount * SHOW_MORE_INCREMENT), totalItems)
+      : COLLAPSED_ITEMS_COUNT;
+    
+    if (showMore) {
+      // If showing more, check if there are still more items to show
+      const remaining = totalItems - currentlyShowing;
+      if (remaining > 0) {
+        return `Show ${Math.min(remaining, SHOW_MORE_INCREMENT)} More`;
+      } else {
+        return 'Show Less';
+      }
+    } else {
+      // If collapsed, show how many more can be shown (max 50)
+      const remaining = totalItems - COLLAPSED_ITEMS_COUNT;
+      return `Show ${Math.min(remaining, SHOW_MORE_INCREMENT)} More`;
+    }
+  };
+
+  // Check if show more button should be displayed
+  const shouldShowMoreButton = (filterType, items) => {
+    const totalItems = items.length;
+    
+    if (totalItems <= COLLAPSED_ITEMS_COUNT) {
+      return false; // No need for button if total items <= collapsed count
+    }
+    
+    return true; // Always show if there are more than COLLAPSED_ITEMS_COUNT items
+  };
+
+  // Toggle main filter section expansion
+  const toggleFilterExpansion = (filterType) => {
+    setExpandedFilters(prev => ({
+      ...prev,
+      [filterType]: !prev[filterType]
+    }));
+    
+    // Reset show more when collapsing
+    if (expandedFilters[filterType]) {
+      setShowMoreFilters(prev => ({
+        ...prev,
+        [filterType]: false
+      }));
+    }
+  };
+
+  // Toggle show more items within a filter
+  const toggleShowMore = (filterType) => {
+    const totalItems = availableFilters[filterType].length;
+    const currentClickCount = showMoreCount[filterType];
+    const currentlyShowing = COLLAPSED_ITEMS_COUNT + (currentClickCount * SHOW_MORE_INCREMENT);
+    
+    setShowMoreFilters(prev => {
+      const newState = { ...prev };
+      const isCurrentlyExpanded = prev[filterType];
+      
+      if (isCurrentlyExpanded && currentlyShowing >= totalItems) {
+        // If we're showing all items, collapse back to initial state
+        newState[filterType] = false;
+        setShowMoreCount(prevCount => ({
+          ...prevCount,
+          [filterType]: 0
+        }));
+      } else if (isCurrentlyExpanded) {
+        // If expanded but not showing all, show 50 more
+        setShowMoreCount(prevCount => ({
+          ...prevCount,
+          [filterType]: prevCount[filterType] + 1
+        }));
+      } else {
+        // If collapsed, start showing more
+        newState[filterType] = true;
+        setShowMoreCount(prevCount => ({
+          ...prevCount,
+          [filterType]: 1
+        }));
+      }
+      
+      return newState;
+    });
+  };
 
   // Use effect to check login status
   useEffect(() => {
     const checkLoginStatus = () => {
       const token = localStorage.getItem('token');
       setIsLoggedIn(!!token); // Convert to boolean
+      console.log('Login status checked - isLoggedIn:', !!token);
     };
 
     const fetchUserProfile = async () => {
@@ -79,6 +390,7 @@ const Home = () => {
         const token = localStorage.getItem('token');
         if (token) {
           try {
+            console.log('Fetching user profile...');
             const response = await fetch('http://localhost:8083/profile', {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -87,8 +399,9 @@ const Home = () => {
             if (response.ok) {
               const profileData = await response.json();
               setUserProfile(profileData);
+              console.log('User profile loaded:', profileData);
             } else {
-              console.error('Failed to fetch profile data');
+              console.error('Failed to fetch profile data, status:', response.status);
             }
           } catch (error) {
             console.error('Error fetching user profile:', error);
@@ -107,45 +420,18 @@ const Home = () => {
     };
   }, [isLoggedIn]);
 
-  useEffect(() => {
-    // Fetch items from the JSON server
-    const fetchItems = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch('http://localhost:8084/items/all');
-        if (!response.ok) {
-          throw new Error(`Server responded with status: ${response.status}`);
-        }
-        const data = await response.json();
-        setItems(data);
-        setFilteredItems(data);
-        // Calculate total pages
-        setTotalPages(Math.ceil(data.length / itemsPerPage));
-        setError(null);
-
-        // Fetch filters if user is logged in
-        if (isLoggedIn) {
-          fetchFilters();
-        }
-      } catch (error) {
-        console.error('Error fetching items:', error);
-        setError('Failed to load items. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchItems();
-  }, [isLoggedIn]);
-
   // Fetch available filters
-  const fetchFilters = async () => {
+  const fetchFilters = useCallback(async () => {
+    console.log('=== FETCH FILTERS DEBUG START ===');
     try {
       const response = await fetch('http://localhost:8084/items/filters');
+      console.log('Filters response status:', response.status);
+      
       if (!response.ok) {
         throw new Error(`Server responded with status: ${response.status}`);
       }
       const data = await response.json();
+      console.log('Raw filters data:', data);
 
       // Process the filters data based on the API structure
       const processedFilters = {
@@ -157,29 +443,95 @@ const Home = () => {
 
       // Process filters based on the API response structure
       if (data && data.filters) {
+        console.log('Processing filters from data.filters');
         data.filters.forEach(filter => {
+          console.log('Processing filter:', filter.filterType, 'with', filter.filters?.length || 0, 'items');
+          
           if (filter.filterType === 'BRAND') {
-            processedFilters.brands = filter.filters || [];
+            const cleaned = cleanAndValidateFilterItems(filter.filters || []);
+            processedFilters.brands = cleaned;
+            console.log('Processed brands:', cleaned.length, 'items');
           } else if (filter.filterType === 'CATEGORY') {
-            processedFilters.categories = filter.filters || [];
+            const cleaned = cleanAndValidateFilterItems(filter.filters || []);
+            processedFilters.categories = cleaned;
+            console.log('Processed categories:', cleaned.length, 'items');
           } else if (filter.filterType === 'MANUFACTURER') {
-            processedFilters.manufacturers = filter.filters || [];
+            const cleaned = cleanAndValidateFilterItems(filter.filters || []);
+            processedFilters.manufacturers = cleaned;
+            console.log('Processed manufacturers:', cleaned.length, 'items');
           } else if (filter.filterType === 'INGREDIENTS') {
-            processedFilters.ingredients = filter.filters || [];
+            const cleaned = cleanAndValidateFilterItems(filter.filters || []);
+            processedFilters.ingredients = cleaned;
+            console.log('Processed ingredients:', cleaned.length, 'items');
+            console.log('Sample ingredients:', cleaned.slice(0, 10));
           }
         });
+      } else {
+        console.log('No data.filters found in response');
       }
 
+      console.log('Final processed filters:', processedFilters);
       setAvailableFilters(processedFilters);
+      console.log('=== FETCH FILTERS DEBUG END ===');
     } catch (error) {
+      console.error('=== FETCH FILTERS ERROR ===');
       console.error('Error fetching filters:', error);
     }
-  };
+  }, []);
 
-  // Search function
+  useEffect(() => {
+    console.log('=== MAIN FETCH ITEMS DEBUG START ===');
+    console.log('isLoggedIn changed to:', isLoggedIn);
+    
+    // Fetch items from the JSON server
+    const fetchItems = async () => {
+      setLoading(true);
+      console.log('Fetching all items...');
+      
+      try {
+        const response = await fetch('http://localhost:8084/items/all');
+        console.log('Items response status:', response.status);
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Fetched items count:', data.length);
+        console.log('Sample items:', data.slice(0, 3));
+        
+        setItems(data);
+        setFilteredItems(data);
+        // Calculate total pages
+        setTotalPages(Math.ceil(data.length / itemsPerPage));
+        setError(null);
+
+        // Fetch filters if user is logged in
+        if (isLoggedIn) {
+          console.log('User is logged in, fetching filters...');
+          fetchFilters();
+        } else {
+          console.log('User not logged in, skipping filter fetch');
+        }
+      } catch (error) {
+        console.error('=== FETCH ITEMS ERROR ===');
+        console.error('Error fetching items:', error);
+        setError('Failed to load items. Please try again later.');
+      } finally {
+        setLoading(false);
+        console.log('=== MAIN FETCH ITEMS DEBUG END ===');
+      }
+    };
+
+    fetchItems();
+  }, [isLoggedIn, fetchFilters]);
+
+  // Enhanced Search function with better authentication handling
   const handleSearch = async () => {
     setHasSearched(true);
-    console.log('Starting search with filters:', selectedFilters);
+    console.log('=== SEARCH DEBUG START ===');
+    console.log('Search term:', searchTerm);
+    console.log('Selected filters:', selectedFilters);
+    console.log('Is logged in:', isLoggedIn);
 
     // Check if there are any active filters
     const hasAnyFilters =
@@ -188,16 +540,20 @@ const Home = () => {
       selectedFilters.manufacturers.length > 0 ||
       selectedFilters.ingredients.length > 0;
 
+    console.log('Has any filters:', hasAnyFilters);
+
     // If search term is empty and no filters are selected, show all items
     if (!searchTerm.trim() && !hasAnyFilters) {
       console.log('No search term or filters, showing all items');
       setFilteredItems(items);
       setTotalPages(Math.ceil(items.length / itemsPerPage));
       setPage(1);
+      console.log('Set filtered items to all items:', items.length);
       return;
     }
 
     setLoading(true);
+    console.log('Starting API search...');
 
     try {
       let url;
@@ -206,9 +562,39 @@ const Home = () => {
       // IMPORTANT: Always include searchTerm parameter, even if empty
       queryParams.append('searchTerm', searchTerm.trim() || "");
 
+      // Check token validity before making request
+      const token = localStorage.getItem('token');
+      console.log('Token exists:', !!token);
+      
+      if (token) {
+        console.log('Token preview:', token.substring(0, 20) + '...');
+        // Decode JWT to check expiration (basic check)
+        try {
+          const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+          const currentTime = Date.now() / 1000;
+          console.log('Token exp:', tokenPayload.exp, 'Current time:', currentTime, 'Expired:', tokenPayload.exp < currentTime);
+          
+          if (tokenPayload.exp < currentTime) {
+            console.warn('Token is expired, switching to guest mode');
+            localStorage.removeItem('token');
+            setIsLoggedIn(false);
+            setSnackbarMessage('Session expired. Searching as guest.');
+            setSnackbarSeverity('warning');
+            setSnackbarOpen(true);
+          }
+        } catch (e) {
+          console.warn('Could not decode token:', e);
+        }
+      }
+
+      // Re-check login status after token validation
+      const currentToken = localStorage.getItem('token');
+      const isCurrentlyLoggedIn = !!currentToken && isLoggedIn;
+
       // If user is logged in, use the advanced search endpoint with filters
-      if (isLoggedIn) {
+      if (isCurrentlyLoggedIn) {
         url = 'http://localhost:8084/items/search';
+        console.log('Using logged-in search endpoint');
 
         // Add selected filters to query params
         if (selectedFilters.brands.length > 0) {
@@ -237,22 +623,25 @@ const Home = () => {
       } else {
         // For guest users, use the guest search endpoint
         url = 'http://localhost:8084/items/searchForGuest';
+        console.log('Using guest search endpoint (user not logged in or token invalid)');
       }
 
       // Add query params to URL
       const fullUrl = `${url}?${queryParams.toString()}`;
-      console.log('Searching with URL:', fullUrl);
+      console.log('Full search URL:', fullUrl);
 
-      const token = localStorage.getItem('token');
       const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       };
 
       // If logged in, add authorization header
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (isCurrentlyLoggedIn && currentToken) {
+        headers['Authorization'] = `Bearer ${currentToken}`;
+        console.log('Added authorization header');
       }
+
+      console.log('Request headers:', headers);
 
       const response = await fetch(fullUrl, {
         method: 'GET',
@@ -260,28 +649,79 @@ const Home = () => {
         credentials: 'include' // Include cookies
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Server error response:', errorText);
-        throw new Error(`Server responded with status: ${response.status}`);
+        
+        // Special handling for authentication errors
+        if (response.status === 401 || response.status === 403) {
+          console.error('Authentication error - token might be expired or invalid');
+          
+          // Clear token and retry as guest
+          localStorage.removeItem('token');
+          setIsLoggedIn(false);
+          setSnackbarMessage('Session expired. Retrying as guest...');
+          setSnackbarSeverity('warning');
+          setSnackbarOpen(true);
+          
+          // Retry the search as guest user
+          console.log('Retrying search as guest user...');
+          const guestUrl = `http://localhost:8084/items/searchForGuest?searchTerm=${encodeURIComponent(searchTerm.trim() || "")}`;
+          const guestResponse = await fetch(guestUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (guestResponse.ok) {
+            const guestData = await guestResponse.json();
+            console.log('Guest search successful:', guestData.length, 'items');
+            setFilteredItems(guestData);
+            setTotalPages(Math.ceil(guestData.length / itemsPerPage));
+            setPage(1);
+            setLoading(false);
+            console.log('=== SEARCH DEBUG END (recovered as guest) ===');
+            return;
+          } else {
+            throw new Error(`Guest search also failed with status: ${guestResponse.status}`);
+          }
+        }
+        
+        throw new Error(`Server responded with status: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
       console.log('Search results received:', data.length, 'items');
+      console.log('First few items:', data.slice(0, 3));
 
       setFilteredItems(data);
       setTotalPages(Math.ceil(data.length / itemsPerPage));
       setPage(1); // Reset to first page
 
+      console.log('Updated state - filteredItems length:', data.length);
+      console.log('Updated state - totalPages:', Math.ceil(data.length / itemsPerPage));
+
     } catch (error) {
-      console.error('Error searching items:', error);
-      setError('Failed to search items. Please try again later.');
+      console.error('=== SEARCH ERROR ===');
+      console.error('Error details:', error);
+      console.error('Error message:', error.message);
+      setError(`Failed to search items: ${error.message}`);
+      setSnackbarMessage('Search failed. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
       setFilteredItems([]);
       setTotalPages(1);
     } finally {
       setLoading(false);
+      console.log('=== SEARCH DEBUG END ===');
     }
   };
+
   // Handle filter changes
   const handleFilterChange = (filterType, value) => {
     console.log(`Toggling ${filterType} filter: ${value}`);
@@ -302,7 +742,7 @@ const Home = () => {
     });
   };
 
-  // Reset filters
+  // Reset filters - FIXED: Explicitly reset all states
   const handleResetFilters = () => {
     console.log('Resetting all filters');
     setSelectedFilters({
@@ -310,6 +750,29 @@ const Home = () => {
       categories: [],
       manufacturers: [],
       ingredients: []
+    });
+    
+    // IMPORTANT: Force all filters to collapsed state
+    setExpandedFilters({
+      brands: false,
+      categories: false,
+      manufacturers: false,
+      ingredients: false
+    });
+    
+    setShowMoreFilters({
+      brands: false,
+      categories: false,
+      manufacturers: false,
+      ingredients: false
+    });
+
+    // Reset show more counts
+    setShowMoreCount({
+      brands: 0,
+      categories: 0,
+      manufacturers: 0,
+      ingredients: 0
     });
   };
 
@@ -329,6 +792,115 @@ const Home = () => {
     handleSearch();
   };
 
+  // Render filter section with two-level expand/collapse functionality
+  const renderFilterSection = (title, filterType, items) => {
+    const isExpanded = expandedFilters[filterType];
+    const showMore = showMoreFilters[filterType];
+    const cleanedItems = cleanAndValidateFilterItems(items || []);
+    const itemsToDisplay = getItemsToDisplay(filterType, cleanedItems);
+    const shouldShowMore = shouldShowMoreButton(filterType, cleanedItems);
+
+    return (
+      <Box key={filterType} sx={{ mb: 2 }}>
+        {/* Filter Category Header - Always Visible */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 1,
+          cursor: 'pointer',
+          padding: '8px',
+          borderRadius: '4px',
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.04)'
+          }
+        }}
+        onClick={() => toggleFilterExpansion(filterType)}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+            {title} ({cleanedItems.length})
+          </Typography>
+          <IconButton
+            size="small"
+            sx={{ color: 'primary.main' }}
+          >
+            {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        </Box>
+        
+        <Divider sx={{ mb: 1 }} />
+        
+        {/* Collapsible Filter Options */}
+        <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+          <Box sx={{ maxHeight: '200px', overflow: 'auto', mb: 1 }}>
+            <FormGroup>
+              {itemsToDisplay.map((item, index) => (
+                <FormControlLabel
+                  key={`${item}-${index}`}
+                  control={
+                    <Checkbox
+                      checked={selectedFilters[filterType].includes(item)}
+                      onChange={() => handleFilterChange(filterType, item)}
+                      size="small"
+                    />
+                  }
+                  label={<Typography variant="body2">{item}</Typography>}
+                />
+              ))}
+            </FormGroup>
+          </Box>
+
+          {/* Show More/Less Button */}
+          {shouldShowMore && (
+            <Box sx={{ textAlign: 'center', mt: 1, mb: 2 }}>
+              <Button
+                size="small"
+                variant="text"
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent triggering parent collapse
+                  toggleShowMore(filterType);
+                }}
+                endIcon={showMore ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  color: 'primary.main',
+                  textTransform: 'none'
+                }}
+              >
+                {getShowMoreButtonText(filterType, cleanedItems)}
+              </Button>
+            </Box>
+          )}
+        </Collapse>
+      </Box>
+    );
+  };
+
+  // FIXED: Add effect to ensure filters are reset when drawer opens
+  useEffect(() => {
+    if (openFilters) {
+      // Ensure all filters start collapsed when drawer opens
+      setExpandedFilters({
+        brands: false,
+        categories: false,
+        manufacturers: false,
+        ingredients: false
+      });
+      setShowMoreFilters({
+        brands: false,
+        categories: false,
+        manufacturers: false,
+        ingredients: false
+      });
+      setShowMoreCount({
+        brands: 0,
+        categories: 0,
+        manufacturers: 0,
+        ingredients: 0
+      });
+    }
+  }, [openFilters]);
+
   // Get current page items
   const getCurrentItems = () => {
     const startIndex = (page - 1) * itemsPerPage;
@@ -336,15 +908,15 @@ const Home = () => {
     return filteredItems.slice(startIndex, endIndex);
   };
 
-const handleChangePage = (event, value) => {
-  // First scroll to top immediately with highest priority
-  window.scrollTo(0, 0);
-  document.body.scrollTop = 0; // For Safari
-  document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
-  
-  // Then update the page state
-  setPage(value);
-};
+  const handleChangePage = (event, value) => {
+    // First scroll to top immediately with highest priority
+    window.scrollTo(0, 0);
+    document.body.scrollTop = 0; // For Safari
+    document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    
+    // Then update the page state
+    setPage(value);
+  };
 
   const handleAddToFavorites = async (id) => {
     // Check if the user is logged in
@@ -504,9 +1076,9 @@ const handleChangePage = (event, value) => {
       onClose={() => setOpenFilters(false)}
       sx={{
         '& .MuiDrawer-paper': {
-          width: 280,
+          width: 350, // Increased width for better spacing
           boxSizing: 'border-box',
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
         },
       }}
     >
@@ -517,103 +1089,27 @@ const handleChangePage = (event, value) => {
 
         <Button
           variant="outlined"
-          sx={{ mb: 2 }}
+          sx={{ mb: 3 }}
           size="small"
           onClick={handleResetFilters}
+          fullWidth
         >
-          Reset Filters
+          Reset All Filters
         </Button>
 
-        {/* Brands */}
-        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mt: 2 }}>Brands</Typography>
-        <Divider sx={{ mb: 1 }} />
-        <Box sx={{ maxHeight: '150px', overflow: 'auto', mb: 2 }}>
-          <FormGroup>
-            {availableFilters.brands.slice(0, 15).map((brand) => (
-              <FormControlLabel
-                key={brand}
-                control={
-                  <Checkbox
-                    checked={selectedFilters.brands.includes(brand)}
-                    onChange={() => handleFilterChange('brands', brand)}
-                    size="small"
-                  />
-                }
-                label={<Typography variant="body2">{brand}</Typography>}
-              />
-            ))}
-          </FormGroup>
-        </Box>
+        {/* Render each filter section with two-level expand/collapse */}
+        {renderFilterSection('Brands', 'brands', availableFilters.brands)}
+        {renderFilterSection('Categories', 'categories', availableFilters.categories)}
+        {renderFilterSection('Manufacturers', 'manufacturers', availableFilters.manufacturers)}
+        {renderFilterSection('Ingredients', 'ingredients', availableFilters.ingredients)}
 
-        {/* Categories */}
-        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mt: 2 }}>Categories</Typography>
-        <Divider sx={{ mb: 1 }} />
-        <Box sx={{ maxHeight: '150px', overflow: 'auto', mb: 2 }}>
-          <FormGroup>
-            {availableFilters.categories.slice(0, 15).map((category) => (
-              <FormControlLabel
-                key={category}
-                control={
-                  <Checkbox
-                    checked={selectedFilters.categories.includes(category)}
-                    onChange={() => handleFilterChange('categories', category)}
-                    size="small"
-                  />
-                }
-                label={<Typography variant="body2">{category}</Typography>}
-              />
-            ))}
-          </FormGroup>
-        </Box>
-
-        {/* Manufacturers */}
-        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mt: 2 }}>Manufacturers</Typography>
-        <Divider sx={{ mb: 1 }} />
-        <Box sx={{ maxHeight: '150px', overflow: 'auto', mb: 2 }}>
-          <FormGroup>
-            {availableFilters.manufacturers.slice(0, 15).map((manufacturer) => (
-              <FormControlLabel
-                key={manufacturer}
-                control={
-                  <Checkbox
-                    checked={selectedFilters.manufacturers.includes(manufacturer)}
-                    onChange={() => handleFilterChange('manufacturers', manufacturer)}
-                    size="small"
-                  />
-                }
-                label={<Typography variant="body2">{manufacturer}</Typography>}
-              />
-            ))}
-          </FormGroup>
-        </Box>
-
-        {/* Ingredients */}
-        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mt: 2 }}>Ingredients</Typography>
-        <Divider sx={{ mb: 1 }} />
-        <Box sx={{ maxHeight: '150px', overflow: 'auto', mb: 2 }}>
-          <FormGroup>
-            {availableFilters.ingredients.slice(0, 15).map((ingredient) => (
-              <FormControlLabel
-                key={ingredient}
-                control={
-                  <Checkbox
-                    checked={selectedFilters.ingredients.includes(ingredient)}
-                    onChange={() => handleFilterChange('ingredients', ingredient)}
-                    size="small"
-                  />
-                }
-                label={<Typography variant="body2">{ingredient}</Typography>}
-              />
-            ))}
-          </FormGroup>
-        </Box>
-
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
           <Button
             variant="contained"
             color="primary"
             onClick={handleApplyFilters}
             fullWidth
+            size="large"
           >
             Apply Filters
           </Button>

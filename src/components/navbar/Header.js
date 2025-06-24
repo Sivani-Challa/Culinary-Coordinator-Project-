@@ -338,7 +338,7 @@ const Header = () => {
               >
                 <Person />
                 <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                  LOGIN / SIGN UP
+                  LOGIN
                 </Typography>
               </Box>
             </Link>
